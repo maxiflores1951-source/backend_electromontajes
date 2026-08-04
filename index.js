@@ -12,6 +12,7 @@ const marcaRoutes = require('./src/routes/marcaRoutes');
 const familiaUnidadRoutes = require('./src/routes/familiaUnidadRoutes');
 const movimientoRoutes = require('./src/routes/movimientoRoutes');
 const lugarRoutes = require('./src/routes/lugarRoutes');
+const herramientaRoutes = require('./src/routes/herramientaRoutes');
 
 const app = express();
 
@@ -30,6 +31,8 @@ app.use('/marcas', marcaRoutes);
 app.use('/familiaunidad', familiaUnidadRoutes);
 app.use('/movimientostock', movimientoRoutes);
 app.use('/lugares', lugarRoutes);
+app.use('/herramienta', herramientaRoutes);
+app.use('/herramientas', herramientaRoutes);
 
 const PORT = process.env.PORT || 3400;
 app.listen(PORT, '0.0.0.0', () => {
