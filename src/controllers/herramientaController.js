@@ -35,17 +35,37 @@ const getNextCode = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const insertedId = await herramientaService.create(req.body);
-    res.status(201).json({
-      message: 'Herramienta insertada correctamente',
-      insertedId,
+    const result = await herramientaService.create(req.body, req.idPersonal);
+    const message = result.updated
+      ? 'Herramienta existente actualizada correctamente'
+      : 'Herramienta insertada correctamente';
+    res.status(result.updated ? 200 : 201).json({
+      message,
+      insertedId: result.insertedId,
+      updated: result.updated,
     });
   } catch (err) {
-    if (err.message.includes('Faltan campos obligatorios')) {
-      return res.status(400).json({ message: 'Faltan campos obligatorios' });
+    if (err.message.includes('Faltan campos obligatorios') || err.message.includes('no existe')) {
+      return res.status(400).json({ message: err.message });
     }
     console.error('Error al insertar herramienta:', err.message);
     res.status(500).json({ message: 'Error al insertar herramienta' });
+  }
+};
+
+const update = async (req, res) => {
+  try {
+    const affected = await herramientaService.update(req.params.codigoHerramienta, req.body, req.idPersonal);
+    res.status(200).json({ message: 'Herramienta actualizada correctamente', affected });
+  } catch (err) {
+    if (err.message.includes('Herramienta no encontrada')) {
+      return res.status(404).json({ error: 'Herramienta no encontrada' });
+    }
+    if (err.message.includes('no existe') || err.message.includes('requerido')) {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error('Error al actualizar herramienta:', err.message);
+    res.status(500).json({ error: 'Error al actualizar herramienta', details: err.message });
   }
 };
 
@@ -53,7 +73,8 @@ const updateCondicion = async (req, res) => {
   try {
     const nuevaCondicion = await herramientaService.updateCondicion(
       req.params.codigoHerramienta,
-      req.body.tipo_operacion
+      req.body.tipo_operacion,
+      req.idPersonal
     );
     res.status(200).json({
       message: `Condición de herramienta actualizada a '${nuevaCondicion}' correctamente.`,
@@ -87,7 +108,8 @@ const updateNombreCondicion = async (req, res) => {
     await herramientaService.updateNombreCondicion(
       req.params.codigoHerramienta,
       req.body.Nombre,
-      req.body.Condicion
+      req.body.Condicion,
+      req.idPersonal
     );
     res.status(200).json({ message: 'Nombre y condición de la herramienta actualizados correctamente.' });
   } catch (err) {
@@ -109,6 +131,7 @@ module.exports = {
   getDisponibles,
   getNextCode,
   create,
+  update,
   updateCondicion,
   getByResponsable,
   updateNombreCondicion,

@@ -25,7 +25,18 @@ const getNextCode = async (familyCode) => {
   throw new Error('Formato de código no válido');
 };
 
-const create = async (data) => {
+const validarReferencias = async (data) => {
+  if (data.codigo_lugar) {
+    const existe = await herramientaModel.lugarExists(data.codigo_lugar);
+    if (!existe) throw new Error(`El código de lugar '${data.codigo_lugar}' no existe`);
+  }
+  if (data.id_marca) {
+    const existe = await herramientaModel.marcaExists(data.id_marca);
+    if (!existe) throw new Error(`La marca con id ${data.id_marca} no existe`);
+  }
+};
+
+const create = async (data, idUsuario) => {
   const {
     CodigoHerramienta, Nombre, CodProveedor,
     CostoNeto, Precio1, Precio2, IVACompras, IVAVentas,
@@ -49,11 +60,22 @@ const create = async (data) => {
     throw new Error('Faltan campos obligatorios');
   }
 
-  const insertId = await herramientaModel.insert(data);
-  return insertId;
+  await validarReferencias(data);
+
+  const existing = await herramientaModel.getByCodigo(CodigoHerramienta);
+  if (existing) {
+    const mergedData = { ...existing, ...data };
+    mergedData.id_modificado = idUsuario;
+    await herramientaModel.updateById(CodigoHerramienta, mergedData);
+    return { insertedId: CodigoHerramienta, updated: true };
+  }
+
+  data.id_creado = idUsuario;
+  await herramientaModel.insert(data);
+  return { insertedId: CodigoHerramienta, updated: false };
 };
 
-const updateCondicion = async (codigoHerramienta, tipo_operacion) => {
+const updateCondicion = async (codigoHerramienta, tipo_operacion, idUsuario) => {
   if (!codigoHerramienta) throw new Error('Código de herramienta requerido');
 
   const operacionesValidas = ['Entrega', 'Devolucion'];
@@ -62,9 +84,20 @@ const updateCondicion = async (codigoHerramienta, tipo_operacion) => {
   }
 
   const nuevaCondicion = tipo_operacion === 'Entrega' ? 'En Uso' : 'Disponible';
-  const affected = await herramientaModel.updateCondicion(codigoHerramienta, nuevaCondicion);
+  const affected = await herramientaModel.updateCondicion(codigoHerramienta, nuevaCondicion, idUsuario);
   if (affected === 0) throw new Error('Herramienta no encontrada');
   return nuevaCondicion;
+};
+
+const update = async (codigoHerramienta, data, idUsuario) => {
+  if (!codigoHerramienta) throw new Error('Código de herramienta requerido');
+  const existing = await herramientaModel.getByCodigo(codigoHerramienta);
+  if (!existing) throw new Error('Herramienta no encontrada');
+  await validarReferencias(data);
+  const mergedData = { ...existing, ...data };
+  mergedData.id_modificado = idUsuario;
+  const affected = await herramientaModel.updateById(codigoHerramienta, mergedData);
+  return affected;
 };
 
 const getByResponsable = async (idResponsable) => {
@@ -74,7 +107,7 @@ const getByResponsable = async (idResponsable) => {
   return rows;
 };
 
-const updateNombreCondicion = async (codigoHerramienta, Nombre, Condicion) => {
+const updateNombreCondicion = async (codigoHerramienta, Nombre, Condicion, idUsuario) => {
   if (!codigoHerramienta) throw new Error('Código de herramienta requerido');
   if (!Nombre || Nombre.trim() === '') {
     throw new Error('El nombre de la herramienta es obligatorio.');
@@ -82,7 +115,7 @@ const updateNombreCondicion = async (codigoHerramienta, Nombre, Condicion) => {
   if (!Condicion || Condicion.trim() === '') {
     throw new Error('La condición de la herramienta es obligatoria.');
   }
-  const affected = await herramientaModel.updateNombreCondicion(codigoHerramienta, Nombre, Condicion);
+  const affected = await herramientaModel.updateNombreCondicion(codigoHerramienta, Nombre, Condicion, idUsuario);
   if (affected === 0) throw new Error('Herramienta no encontrada');
   return affected;
 };
@@ -93,6 +126,7 @@ module.exports = {
   getNextCode,
   create,
   updateCondicion,
+  update,
   getByResponsable,
   updateNombreCondicion,
 };

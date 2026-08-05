@@ -13,6 +13,7 @@ const familiaUnidadRoutes = require('./src/routes/familiaUnidadRoutes');
 const movimientoRoutes = require('./src/routes/movimientoRoutes');
 const lugarRoutes = require('./src/routes/lugarRoutes');
 const herramientaRoutes = require('./src/routes/herramientaRoutes');
+const herramientaMovimientoRoutes = require('./src/routes/herramientaMovimientoRoutes');
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use('/movimientostock', movimientoRoutes);
 app.use('/lugares', lugarRoutes);
 app.use('/herramienta', herramientaRoutes);
 app.use('/herramientas', herramientaRoutes);
+app.use('/movimientosherramientas', herramientaMovimientoRoutes);
 
 const PORT = process.env.PORT || 3400;
 app.listen(PORT, '0.0.0.0', () => {

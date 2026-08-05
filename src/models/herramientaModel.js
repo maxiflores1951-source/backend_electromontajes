@@ -37,14 +37,17 @@ const getAll = async (estado) => {
       h.IVACompras,
       h.IVAVentas,
       h.Marca,
+      h.id_marca,
+      m.nombre as nombre_marca,
       h.Modelo,
       h.FechaAdquisicion,
       h.ImagenPath,
       h.Condicion,
       h.Ubicacion,
+      h.codigo_lugar,
+      l.nombre_lugar,
       h.Observacion,
-      CASE
-        WHEN h.Condicion = 'Baja' THEN 'Baja'
+      CASE WHEN h.Condicion = 'Baja' THEN 'Baja'
         WHEN mh.actual = 1 AND msh.tipo_operacion = 'Entrega' THEN 'En uso'
         ELSE 'Disponible'
       END as estado,
@@ -56,6 +59,8 @@ const getAll = async (estado) => {
       familiaherramienta f ON h.CodigoFamilia = f.Cod_Familia
     JOIN
       proveedor p ON h.CodProveedor = p.Cod_Proveedor
+    LEFT JOIN marcas m ON h.id_marca = m.id
+    LEFT JOIN lugares l ON h.codigo_lugar = l.codigo
     LEFT JOIN movimiento_herramientas mh
       ON h.CodigoHerramienta = mh.codigoHerramienta
       AND mh.actual = 1
@@ -84,16 +89,22 @@ const getDisponibles = async () => {
       h.IVACompras,
       h.IVAVentas,
       h.Marca,
+      h.id_marca,
+      m.nombre as nombre_marca,
       h.Modelo,
       h.FechaAdquisicion,
       h.ImagenPath,
       h.Condicion,
       h.Ubicacion,
+      h.codigo_lugar,
+      l.nombre_lugar,
       h.Observacion
     FROM
       Herramienta h
     JOIN
       familiaherramienta f ON h.CodigoFamilia = f.Cod_Familia
+    LEFT JOIN marcas m ON h.id_marca = m.id
+    LEFT JOIN lugares l ON h.codigo_lugar = l.codigo
     WHERE
       h.Condicion = 'Disponible';
   `;
@@ -105,10 +116,25 @@ const getNextCode = async (familyCode) => {
   const query = `
     SELECT CodigoHerramienta FROM Herramienta
     WHERE CodigoFamilia = ?
-    ORDER BY CodigoHerramienta DESC LIMIT 1
+    ORDER BY LENGTH(CodigoHerramienta) DESC, CodigoHerramienta DESC LIMIT 1
   `;
   const [results] = await db.query(query, [familyCode]);
   return results;
+};
+
+const getByCodigo = async (codigoHerramienta) => {
+  const [rows] = await db.execute('SELECT * FROM herramienta WHERE CodigoHerramienta = ?', [codigoHerramienta]);
+  return rows[0];
+};
+
+const lugarExists = async (codigo) => {
+  const [rows] = await db.query('SELECT codigo FROM lugares WHERE codigo = ?', [codigo]);
+  return rows.length > 0;
+};
+
+const marcaExists = async (id) => {
+  const [rows] = await db.query('SELECT id FROM marcas WHERE id = ?', [id]);
+  return rows.length > 0;
 };
 
 const insert = async (data) => {
@@ -131,13 +157,17 @@ const insert = async (data) => {
       IVACompras,
       IVAVentas,
       Marca,
+      id_marca,
       Modelo,
       FechaAdquisicion,
       ImagenPath,
       Condicion,
       Ubicacion,
-      Observacion
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      codigo_lugar,
+      Observacion,
+      id_creacion,
+      id_creado
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const [result] = await db.query(sql, [
@@ -151,23 +181,30 @@ const insert = async (data) => {
     IVACompras || 0,
     IVAVentas || 0,
     Marca,
+    data.id_marca,
     Modelo,
     FechaAdquisicion,
     ImagenPath,
     Condicion,
     Ubicacion,
+    data.codigo_lugar,
     Observacion,
+    data.id_creado || null,
+    data.id_creado || null,
   ]);
   return result.insertId;
 };
 
-const updateCondicion = async (codigoHerramienta, nuevaCondicion) => {
+const updateCondicion = async (codigoHerramienta, nuevaCondicion, idUsuario) => {
   const query = `
     UPDATE herramienta
-    SET Condicion = ?
+    SET Condicion = ?,
+        id_modificacion = ?,
+        id_modificado = ?,
+        FechaModificacion = NOW()
     WHERE CodigoHerramienta = ?
   `;
-  const [result] = await db.execute(query, [nuevaCondicion, codigoHerramienta]);
+  const [result] = await db.execute(query, [nuevaCondicion, idUsuario || null, idUsuario || null, codigoHerramienta]);
   return result.affectedRows;
 };
 
@@ -184,11 +221,15 @@ const getByResponsable = async (idResponsable) => {
       h.IVACompras,
       h.IVAVentas,
       h.Marca,
+      h.id_marca,
+      m.nombre as nombre_marca,
       h.Modelo,
       h.FechaAdquisicion,
       h.ImagenPath,
       h.Condicion,
       h.Ubicacion,
+      h.codigo_lugar,
+      l.nombre_lugar,
       h.Observacion,
       msh.responsable,
       msh.fecha_registro,
@@ -199,6 +240,8 @@ const getByResponsable = async (idResponsable) => {
       movimiento_herramientas mh ON h.CodigoHerramienta = mh.codigoHerramienta
     JOIN
       movimientosstockherramientas msh ON mh.movimiento_id = msh.id
+    LEFT JOIN marcas m ON h.id_marca = m.id
+    LEFT JOIN lugares l ON h.codigo_lugar = l.codigo
     WHERE
       msh.responsable = ?
       AND mh.actual = 1
@@ -208,13 +251,74 @@ const getByResponsable = async (idResponsable) => {
   return rows;
 };
 
-const updateNombreCondicion = async (codigoHerramienta, Nombre, Condicion) => {
+const updateNombreCondicion = async (codigoHerramienta, Nombre, Condicion, idUsuario) => {
   const query = `
     UPDATE herramienta
-    SET Nombre = ?, Condicion = ?
+    SET Nombre = ?, Condicion = ?,
+        id_modificacion = ?,
+        id_modificado = ?,
+        FechaModificacion = NOW()
     WHERE CodigoHerramienta = ?
   `;
-  const [result] = await db.execute(query, [Nombre, Condicion, codigoHerramienta]);
+  const [result] = await db.execute(query, [Nombre, Condicion, idUsuario || null, idUsuario || null, codigoHerramienta]);
+  return result.affectedRows;
+};
+
+const updateById = async (codigoHerramienta, data) => {
+  const {
+    Nombre, CodigoFamilia, CodProveedor,
+    CostoNeto, Precio1, Precio2, IVACompras, IVAVentas,
+    Marca, id_marca, Modelo, FechaAdquisicion, ImagenPath,
+    Condicion, Ubicacion, codigo_lugar, Observacion,
+    id_modificado,
+  } = data;
+
+  const query = `
+    UPDATE herramienta
+    SET
+      Nombre = ?,
+      CodProveedor = ?,
+      CostoNeto = ?,
+      Precio1 = ?,
+      Precio2 = ?,
+      IVACompras = ?,
+      IVAVentas = ?,
+      Marca = ?,
+      id_marca = ?,
+      Modelo = ?,
+      FechaAdquisicion = ?,
+      ImagenPath = ?,
+      Condicion = ?,
+      Ubicacion = ?,
+      codigo_lugar = ?,
+      Observacion = ?,
+      id_modificacion = ?,
+      id_modificado = ?,
+      FechaModificacion = NOW()
+    WHERE CodigoHerramienta = ?
+  `;
+
+  const [result] = await db.execute(query, [
+    Nombre,
+    CodProveedor,
+    CostoNeto || 0,
+    Precio1 || 0,
+    Precio2 || 0,
+    IVACompras || 0,
+    IVAVentas || 0,
+    Marca,
+    id_marca || null,
+    Modelo,
+    FechaAdquisicion,
+    ImagenPath,
+    Condicion,
+    Ubicacion,
+    codigo_lugar || null,
+    Observacion,
+    id_modificado || null,
+    id_modificado || null,
+    codigoHerramienta,
+  ]);
   return result.affectedRows;
 };
 
@@ -222,8 +326,12 @@ module.exports = {
   getAll,
   getDisponibles,
   getNextCode,
+  getByCodigo,
+  lugarExists,
+  marcaExists,
   insert,
   updateCondicion,
   getByResponsable,
   updateNombreCondicion,
+  updateById,
 };
