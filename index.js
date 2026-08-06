@@ -35,6 +35,8 @@ app.use('/lugares', lugarRoutes);
 app.use('/herramienta', herramientaRoutes);
 app.use('/herramientas', herramientaRoutes);
 app.use('/movimientosherramientas', herramientaMovimientoRoutes);
+app.use('/movimientos_herramientas', herramientaMovimientoRoutes);
+app.use('/movimientostockh', herramientaMovimientoRoutes);
 
 const PORT = process.env.PORT || 3400;
 app.listen(PORT, '0.0.0.0', () => {

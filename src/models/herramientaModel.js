@@ -47,6 +47,8 @@ const getAll = async (estado) => {
       h.codigo_lugar,
       l.nombre_lugar,
       h.Observacion,
+      h.FechaCreacion,
+      h.FechaModificacion,
       CASE WHEN h.Condicion = 'Baja' THEN 'Baja'
         WHEN mh.actual = 1 AND msh.tipo_operacion = 'Entrega' THEN 'En uso'
         ELSE 'Disponible'
@@ -98,7 +100,9 @@ const getDisponibles = async () => {
       h.Ubicacion,
       h.codigo_lugar,
       l.nombre_lugar,
-      h.Observacion
+      h.Observacion,
+      h.FechaCreacion,
+      h.FechaModificacion
     FROM
       Herramienta h
     JOIN
@@ -231,6 +235,8 @@ const getByResponsable = async (idResponsable) => {
       h.codigo_lugar,
       l.nombre_lugar,
       h.Observacion,
+      h.FechaCreacion,
+      h.FechaModificacion,
       msh.responsable,
       msh.fecha_registro,
       msh.tipo_operacion
