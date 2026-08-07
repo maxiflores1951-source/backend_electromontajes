@@ -14,19 +14,19 @@ const getLastCodigo = async (connection) => {
 
 const insertOrden = async (connection, params) => {
   const {
-    codigoOrden, fecha_pedido, fecha_entrega, id_soliciado, id_entregado,
-    id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion
+    codigoOrden, fecha_pedido, fecha_entrega, id_solicitado, id_entregado,
+    id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion, id_creado
   } = params;
 
   const query = `
-    INSERT INTO orden_compra (codigo, fecha_pedido, fecha_entrega, id_solicitado, id_entregado, id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    INSERT INTO orden_compra (codigo, fecha_pedido, fecha_entrega, id_solicitado, id_entregado, id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion, id_creado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   await connection.query(query, [
     codigoOrden,
     fecha_pedido,
     fecha_entrega,
-    id_soliciado,
+    id_solicitado,
     id_entregado,
     id_proveedor,
     id_motivo,
@@ -34,7 +34,8 @@ const insertOrden = async (connection, params) => {
     id_movil,
     activo,
     id_razon_social,
-    observacion
+    observacion,
+    id_creado ?? null
   ]);
 };
 
@@ -57,7 +58,9 @@ const getOrdenesCompra = async () => {
            pe.NOMBRE AS nombre_entregado,
            rs.razon_social,
            rs.cuil,
-           s.OBRA AS nombre_obra
+           s.OBRA AS nombre_obra,
+           pc.NOMBRE AS creado_por,
+           pm.NOMBRE AS modificado_por
     FROM orden_compra oc
     JOIN proveedor p ON oc.id_proveedor = p.Cod_Proveedor
     LEFT JOIN motivos m ON oc.id_motivo = m.codigo
@@ -65,6 +68,8 @@ const getOrdenesCompra = async () => {
     LEFT JOIN personal pe ON oc.id_entregado = pe.ID
     LEFT JOIN razones_sociales rs ON oc.id_razon_social = rs.id
     LEFT JOIN servicios s ON oc.id_servicio = s.IDOBRA
+    LEFT JOIN personal pc ON oc.id_creado = pc.ID
+    LEFT JOIN personal pm ON oc.id_modificado = pm.ID
     ORDER BY oc.codigo DESC;
   `);
   return rows;
@@ -102,7 +107,9 @@ const getOrdenesNoAfectadas = async () => {
            pe.NOMBRE AS nombre_entregado,
            rs.razon_social,
            rs.cuil,
-           s.OBRA AS nombre_obra
+           s.OBRA AS nombre_obra,
+           pc.NOMBRE AS creado_por,
+           pm.NOMBRE AS modificado_por
     FROM orden_compra oc
     JOIN proveedor p ON oc.id_proveedor = p.Cod_Proveedor
     LEFT JOIN motivos m ON oc.id_motivo = m.codigo
@@ -110,6 +117,8 @@ const getOrdenesNoAfectadas = async () => {
     LEFT JOIN personal pe ON oc.id_entregado = pe.ID
     LEFT JOIN razones_sociales rs ON oc.id_razon_social = rs.id
     LEFT JOIN servicios s ON oc.id_servicio = s.IDOBRA
+    LEFT JOIN personal pc ON oc.id_creado = pc.ID
+    LEFT JOIN personal pm ON oc.id_modificado = pm.ID
     WHERE oc.activo = 1
       AND NOT EXISTS (
         SELECT 1
@@ -138,7 +147,7 @@ const getRemitosOrden = async (codigo) => {
 const updateOrden = async (connection, params) => {
   const {
     codigoOrden, fecha_pedido, fecha_entrega, id_solicitado, id_entregado,
-    id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion
+    id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion, id_modificado
   } = params;
 
   const query = `
@@ -153,7 +162,9 @@ const updateOrden = async (connection, params) => {
          id_movil          = ?,
          activo            = ?,
          id_razon_social   = ?,
-         observacion       = ?
+         observacion       = ?,
+         id_modificado     = ?,
+         fecha_modificacion = NOW()
     WHERE codigo = ?`;
 
   await connection.query(query, [
@@ -168,6 +179,7 @@ const updateOrden = async (connection, params) => {
     activo,
     id_razon_social,
     observacion,
+    id_modificado ?? null,
     codigoOrden
   ]);
 };

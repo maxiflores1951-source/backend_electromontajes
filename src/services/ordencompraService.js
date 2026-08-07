@@ -18,10 +18,12 @@ const generarCodigoMovimiento = async (connection) => {
 };
 
 const create = async (data) => {
+  console.log('[ORDEN COMPRA - CREATE] Datos recibidos:', JSON.stringify(data, null, 2));
+
   const {
     fecha_pedido,
     fecha_entrega,
-    id_soliciado,
+    id_solicitado,
     id_entregado,
     id_proveedor,
     id_motivo,
@@ -30,7 +32,8 @@ const create = async (data) => {
     activo,
     id_razon_social,
     item,
-    observacion
+    observacion,
+    id_creado
   } = data;
 
   const connection = await ordencompraModel.getConnection();
@@ -43,16 +46,17 @@ const create = async (data) => {
     await ordencompraModel.insertOrden(connection, {
       codigoOrden,
       fecha_pedido,
-      fecha_entrega,
-      id_soliciado,
-      id_entregado,
+      fecha_entrega: fecha_entrega || fecha_pedido,
+      id_solicitado,
+      id_entregado: id_entregado || id_solicitado,
       id_proveedor,
       id_motivo,
       id_servicio,
       id_movil,
       activo,
       id_razon_social,
-      observacion
+      observacion,
+      id_creado
     });
 
     const movimientosData = (item || []).map(({ id_articulo, id_concepto, tipo_operacion, nombre, unidad, cantidad }) => [
@@ -119,6 +123,8 @@ const getNoAfectadas = async () => {
 };
 
 const update = async (codigoOrden, data) => {
+  console.log(`[ORDEN COMPRA - UPDATE] Codigo: ${codigoOrden}, Datos recibidos:`, JSON.stringify(data, null, 2));
+
   const {
     fecha_pedido,
     fecha_entrega,
@@ -131,6 +137,7 @@ const update = async (codigoOrden, data) => {
     activo,
     id_razon_social,
     observacion,
+    id_modificado,
     item
   } = data;
 
@@ -151,7 +158,8 @@ const update = async (codigoOrden, data) => {
       id_movil,
       activo,
       id_razon_social,
-      observacion
+      observacion,
+      id_modificado
     });
 
     await ordencompraModel.deleteMovimientosOrden(connection, codigoOrden);
