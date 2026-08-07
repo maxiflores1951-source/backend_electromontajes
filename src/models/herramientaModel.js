@@ -44,8 +44,6 @@ const getAll = async (estado) => {
       h.ImagenPath,
       h.Condicion,
       h.Ubicacion,
-      h.codigo_lugar,
-      l.nombre_lugar,
       h.Observacion,
       h.FechaCreacion,
       h.FechaModificacion,
@@ -62,7 +60,6 @@ const getAll = async (estado) => {
     JOIN
       proveedor p ON h.CodProveedor = p.Cod_Proveedor
     LEFT JOIN marcas m ON h.id_marca = m.id
-    LEFT JOIN lugares l ON h.codigo_lugar = l.codigo
     LEFT JOIN movimiento_herramientas mh
       ON h.CodigoHerramienta = mh.codigoHerramienta
       AND mh.actual = 1
@@ -98,8 +95,6 @@ const getDisponibles = async () => {
       h.ImagenPath,
       h.Condicion,
       h.Ubicacion,
-      h.codigo_lugar,
-      l.nombre_lugar,
       h.Observacion,
       h.FechaCreacion,
       h.FechaModificacion
@@ -108,7 +103,6 @@ const getDisponibles = async () => {
     JOIN
       familiaherramienta f ON h.CodigoFamilia = f.Cod_Familia
     LEFT JOIN marcas m ON h.id_marca = m.id
-    LEFT JOIN lugares l ON h.codigo_lugar = l.codigo
     WHERE
       h.Condicion = 'Disponible';
   `;
@@ -167,11 +161,10 @@ const insert = async (data) => {
       ImagenPath,
       Condicion,
       Ubicacion,
-      codigo_lugar,
       Observacion,
       id_creacion,
       id_creado
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const [result] = await db.query(sql, [
@@ -191,7 +184,6 @@ const insert = async (data) => {
     ImagenPath,
     Condicion,
     Ubicacion,
-    data.codigo_lugar,
     Observacion,
     data.id_creado || null,
     data.id_creado || null,
@@ -232,8 +224,6 @@ const getByResponsable = async (idResponsable) => {
       h.ImagenPath,
       h.Condicion,
       h.Ubicacion,
-      h.codigo_lugar,
-      l.nombre_lugar,
       h.Observacion,
       h.FechaCreacion,
       h.FechaModificacion,
@@ -247,7 +237,6 @@ const getByResponsable = async (idResponsable) => {
     JOIN
       movimientosstockherramientas msh ON mh.movimiento_id = msh.id
     LEFT JOIN marcas m ON h.id_marca = m.id
-    LEFT JOIN lugares l ON h.codigo_lugar = l.codigo
     WHERE
       msh.responsable = ?
       AND mh.actual = 1
@@ -275,8 +264,8 @@ const updateById = async (codigoHerramienta, data) => {
     Nombre, CodigoFamilia, CodProveedor,
     CostoNeto, Precio1, Precio2, IVACompras, IVAVentas,
     Marca, id_marca, Modelo, FechaAdquisicion, ImagenPath,
-    Condicion, Ubicacion, codigo_lugar, Observacion,
-    id_modificado,
+      Condicion, Ubicacion, Observacion,
+      id_modificado,
   } = data;
 
   const query = `
@@ -296,7 +285,6 @@ const updateById = async (codigoHerramienta, data) => {
       ImagenPath = ?,
       Condicion = ?,
       Ubicacion = ?,
-      codigo_lugar = ?,
       Observacion = ?,
       id_modificacion = ?,
       id_modificado = ?,
@@ -319,7 +307,6 @@ const updateById = async (codigoHerramienta, data) => {
     ImagenPath,
     Condicion,
     Ubicacion,
-    codigo_lugar || null,
     Observacion,
     id_modificado || null,
     id_modificado || null,
