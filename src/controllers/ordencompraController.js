@@ -6,6 +6,9 @@ const create = async (req, res) => {
     res.status(201).json({ message: 'Orden de compra y movimientos registrados con éxito', codigoOrden });
   } catch (error) {
     console.error('Error al procesar la orden de compra:', error);
+    if (error.message.includes('códigos de concepto no existen')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Error al registrar la orden de compra y los movimientos' });
   }
 };
@@ -40,6 +43,9 @@ const update = async (req, res) => {
     });
   } catch (error) {
     console.error('Error al actualizar la orden de compra:', error);
+    if (error.message.includes('códigos de concepto no existen')) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'No se pudo actualizar la orden de compra' });
   }
 };

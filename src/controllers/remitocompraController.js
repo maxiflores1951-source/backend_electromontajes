@@ -14,7 +14,7 @@ const create = async (req, res) => {
       codigoOrden: resultado.codigoOrden
     });
   } catch (error) {
-    if (error.message.includes('Faltan datos obligatorios') || error.message.includes('activo') || error.message.includes('Datos incompletos')) {
+    if (error.message.includes('Faltan datos obligatorios') || error.message.includes('activo') || error.message.includes('Datos incompletos') || error.message.includes('No se pudo crear la variante')) {
       return res.status(400).json({ error: error.message });
     }
     console.error('Error al procesar la orden de compra:', error.message || error);
@@ -75,7 +75,7 @@ const update = async (req, res) => {
       codigo
     });
   } catch (error) {
-    if (error.message.includes('Faltan datos obligatorios') || error.message.includes('activo') || error.message.includes('Datos incompletos')) {
+    if (error.message.includes('Faltan datos obligatorios') || error.message.includes('activo') || error.message.includes('Datos incompletos') || error.message.includes('No se pudo crear la variante')) {
       return res.status(400).json({ error: error.message });
     }
     console.error('Error al actualizar la orden de compra:', error.message || error);

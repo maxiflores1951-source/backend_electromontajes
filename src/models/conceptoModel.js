@@ -15,7 +15,18 @@ const getLastCodeByFamilia = async (familyCode) => {
   return rows[0];
 };
 
+const existsByCodes = async (codes) => {
+  if (!codes || codes.length === 0) return [];
+  const placeholders = codes.map(() => '?').join(',');
+  const [rows] = await db.query(
+    `SELECT codigo FROM concepto WHERE codigo IN (${placeholders})`,
+    codes
+  );
+  return rows.map(r => r.codigo);
+};
+
 module.exports = {
   getAll,
   getLastCodeByFamilia,
+  existsByCodes,
 };

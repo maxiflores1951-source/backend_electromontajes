@@ -1,4 +1,5 @@
 const ordencompraModel = require('../models/ordencompraModel');
+const conceptoModel = require('../models/conceptoModel');
 
 const generarCodigoMovimiento = async (connection) => {
   const ultimoCodigo = await ordencompraModel.getLastCodigo(connection);
@@ -17,8 +18,9 @@ const generarCodigoMovimiento = async (connection) => {
   }
 };
 
-const create = async (data) => {
+const create = async (data = {}) => {
   console.log('[ORDEN COMPRA - CREATE] Datos recibidos:', JSON.stringify(data, null, 2));
+
 
   const {
     fecha_pedido,
@@ -31,9 +33,10 @@ const create = async (data) => {
     id_movil,
     activo,
     id_razon_social,
-    item,
+    item = [],
     observacion,
     id_creado
+
   } = data;
 
   const connection = await ordencompraModel.getConnection();
@@ -49,6 +52,7 @@ const create = async (data) => {
       fecha_entrega: fecha_entrega || fecha_pedido,
       id_solicitado,
       id_entregado: id_entregado || id_solicitado,
+
       id_proveedor,
       id_motivo,
       id_servicio,
@@ -59,18 +63,32 @@ const create = async (data) => {
       id_creado
     });
 
-    const movimientosData = (item || []).map(({ id_articulo, id_concepto, tipo_operacion, nombre, unidad, cantidad }) => [
+    const movimientosData = (item || []).map(({ id_articulo, id_concepto, tipo_movimiento, nombre, unidad, cantidad, codigo_tipo_epp, codigo_epp }) => [
       codigoOrden,
-      tipo_operacion === 'articulo' ? 'articulo' : 'concepto',
+      tipo_movimiento,
       id_articulo,
       id_concepto,
       unidad,
       nombre,
       cantidad,
-      1
+      1,
+      codigo_epp,
+      codigo_tipo_epp
     ]);
 
     if (movimientosData.length > 0) {
+      const conceptosEnMovimientos = movimientosData
+        .filter(m => m[1] === 'concepto' && m[3] != null)
+        .map(m => String(m[3]));
+
+      if (conceptosEnMovimientos.length > 0) {
+        const existentes = await conceptoModel.existsByCodes(conceptosEnMovimientos);
+        const faltantes = conceptosEnMovimientos.filter(c => !existentes.includes(c));
+        if (faltantes.length > 0) {
+          throw new Error(`Los siguientes códigos de concepto no existen: ${faltantes.join(', ')}`);
+        }
+      }
+
       await ordencompraModel.insertMovimientos(connection, movimientosData);
     }
 
@@ -122,8 +140,9 @@ const getNoAfectadas = async () => {
   return ordenesConMovimientosYRemitos;
 };
 
-const update = async (codigoOrden, data) => {
+const update = async (codigoOrden, data = {}) => {
   console.log(`[ORDEN COMPRA - UPDATE] Codigo: ${codigoOrden}, Datos recibidos:`, JSON.stringify(data, null, 2));
+
 
   const {
     fecha_pedido,
@@ -138,7 +157,8 @@ const update = async (codigoOrden, data) => {
     id_razon_social,
     observacion,
     id_modificado,
-    item
+    item = []
+
   } = data;
 
   const connection = await ordencompraModel.getConnection();
@@ -164,7 +184,7 @@ const update = async (codigoOrden, data) => {
 
     await ordencompraModel.deleteMovimientosOrden(connection, codigoOrden);
 
-    const movimientosData = (item || []).map(({ id_articulo, id_concepto, tipo_movimiento, nombre, unidad, cantidad }) => [
+    const movimientosData = (item || []).map(({ id_articulo, id_concepto, tipo_movimiento, nombre, unidad, cantidad, codigo_tipo_epp, codigo_epp }) => [
       codigoOrden,
       tipo_movimiento,
       id_articulo,
@@ -172,10 +192,24 @@ const update = async (codigoOrden, data) => {
       unidad,
       nombre,
       cantidad,
-      1
+      1,
+      codigo_epp,
+      codigo_tipo_epp
     ]);
 
     if (movimientosData.length) {
+      const conceptosEnMovimientos = movimientosData
+        .filter(m => m[1] === 'concepto' && m[3] != null)
+        .map(m => String(m[3]));
+
+      if (conceptosEnMovimientos.length > 0) {
+        const existentes = await conceptoModel.existsByCodes(conceptosEnMovimientos);
+        const faltantes = conceptosEnMovimientos.filter(c => !existentes.includes(c));
+        if (faltantes.length > 0) {
+          throw new Error(`Los siguientes códigos de concepto no existen: ${faltantes.join(', ')}`);
+        }
+      }
+
       await ordencompraModel.insertMovimientosUpdate(connection, movimientosData);
     }
 

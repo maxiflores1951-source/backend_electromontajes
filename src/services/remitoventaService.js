@@ -1,5 +1,6 @@
 const db = require('../../db');
 const remitoventaModel = require('../models/remitoventaModel');
+const articuloService = require('./articuloService');
 
 const generarCodigoRemitoVenta = async () => {
   const result = await remitoventaModel.getUltimoCodigo();
@@ -29,6 +30,7 @@ const insertarRemitoVenta = async (data) => {
     id_movil,
     observacion,
     articulos,
+    id_lugar,
   } = data;
 
   const codigo = await generarCodigoRemitoVenta();
@@ -75,6 +77,8 @@ const insertarRemitoVenta = async (data) => {
       console.error('Error al insertar artículo en el remito:', detalleError);
       throw new Error(`Error al insertar el artículo ${articulo.id}`);
     }
+
+    await articuloService.ajustarStock(articulo.id, articulo.cantidad, 'Salida', id_lugar || 'TQ');
   }
 
   return codigo;
@@ -167,6 +171,7 @@ const actualizarRemitoVenta = async (codigo, data) => {
     id_movil,
     observacion,
     articulos,
+    id_lugar,
   } = data;
 
   const checkRemito = await remitoventaModel.getRemitoByCodigo(codigo);
@@ -186,6 +191,14 @@ const actualizarRemitoVenta = async (codigo, data) => {
     observacion,
   });
 
+  const movimientosViejos = await remitoventaModel.getMovimientosByCodigo(codigo);
+
+  for (const mov of movimientosViejos) {
+    if (mov.id_articulo) {
+      await articuloService.ajustarStock(mov.id_articulo, mov.cantidad, 'Entrada', id_lugar || 'TQ');
+    }
+  }
+
   await remitoventaModel.deleteMovimientos(codigo);
 
   for (const articulo of articulos) {
@@ -198,6 +211,10 @@ const actualizarRemitoVenta = async (codigo, data) => {
       precio: articulo.precio ?? 0,
       codigo_factura_compra: codigoFactura,
     });
+
+    if (articulo.id_articulo) {
+      await articuloService.ajustarStock(articulo.id_articulo, articulo.cantidad, 'Salida', id_lugar || 'TQ');
+    }
   }
 
   return codigo;

@@ -18,6 +18,7 @@ const insertOrden = async (connection, params) => {
     id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion, id_creado
   } = params;
 
+
   const query = `
     INSERT INTO orden_compra (codigo, fecha_pedido, fecha_entrega, id_solicitado, id_entregado, id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion, id_creado)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
@@ -41,7 +42,7 @@ const insertOrden = async (connection, params) => {
 
 const insertMovimientos = async (connection, movimientosData) => {
   const query = `
-    INSERT INTO movimientos_compras (codigo_orden_compra, tipo_movimiento, id_articulo, id_concepto, unidad, nombre, cantidad, activo)
+    INSERT INTO movimientos_compras (codigo_orden_compra, tipo_movimiento, id_articulo, id_concepto, unidad, nombre, cantidad, activo, codigo_epp, codigo_tipo_epp)
     VALUES ?`;
   await connection.query(query, [movimientosData]);
 };
@@ -80,10 +81,12 @@ const getMovimientosOrden = async (codigo) => {
     SELECT mc.*,
            a.Nombre_Art AS nombre_articulo,
            c.nombre AS nombre_concepto,
-           COALESCE(c.iva_compras, a.Iva_Compras) AS iva_compras
+           COALESCE(c.iva_compras, a.Iva_Compras) AS iva_compras,
+           te.tipo AS nombre_tipo_epp
     FROM movimientos_compras mc
     LEFT JOIN articulo a ON mc.id_articulo = a.Cod_Articulo
     LEFT JOIN concepto c ON mc.id_concepto = c.codigo
+    LEFT JOIN tipos_elementos te ON mc.codigo_tipo_epp = te.codigo
     WHERE mc.codigo_orden_compra = ?
   `, [codigo]);
   return rows;
@@ -150,6 +153,9 @@ const updateOrden = async (connection, params) => {
     id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion, id_modificado
   } = params;
 
+  const fechaEntregaFinal = fecha_entrega || fecha_pedido || new Date();
+  const idEntregadoFinal = id_entregado || id_solicitado || null;
+
   const query = `
     UPDATE orden_compra
     SET  fecha_pedido      = ?,
@@ -169,9 +175,9 @@ const updateOrden = async (connection, params) => {
 
   await connection.query(query, [
     fecha_pedido,
-    fecha_entrega,
+    fechaEntregaFinal,
     id_solicitado,
-    id_entregado,
+    idEntregadoFinal,
     id_proveedor,
     id_motivo,
     id_servicio,
@@ -192,7 +198,7 @@ const insertMovimientosUpdate = async (connection, movimientosData) => {
   const query = `
     INSERT INTO movimientos_compras
       (codigo_orden_compra, tipo_movimiento, id_articulo, id_concepto,
-       unidad, nombre, cantidad, activo)
+       unidad, nombre, cantidad, activo, codigo_epp, codigo_tipo_epp)
     VALUES ?`;
   await connection.query(query, [movimientosData]);
 };

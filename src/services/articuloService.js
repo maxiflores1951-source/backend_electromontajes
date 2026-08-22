@@ -75,10 +75,7 @@ const ajustarStock = async (codArticulo, cantidad, tipoOperacion, idLugar) => {
   if (tipoOperacion === 'Entrada') {
     nuevaCantidad = cantidadActual + cantidadNum;
   } else {
-    if (cantidadActual < cantidadNum) {
-      throw new Error(`No hay suficiente stock en ${nombreLugar} para realizar la operación.`);
-    }
-    nuevaCantidad = cantidadActual - cantidadNum;
+    nuevaCantidad = Math.max(0, cantidadActual - cantidadNum);
   }
 
   const affected = await articuloModel.updateCantidad(codArticulo, campo, nuevaCantidad);

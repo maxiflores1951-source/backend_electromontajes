@@ -39,7 +39,7 @@ const insertRemito = async (params) => {
 const insertMovimientos = async (codigoOrden, movimientosData) => {
   const query = `
     INSERT INTO movimientos_remito_compras
-    (codigo_remito_compra, tipo_movimiento, id_articulo, id_herramienta, id_epp, id_concepto, unidad, nombre, cantidad, activo)
+    (codigo_remito_compra, tipo_movimiento, id_articulo, id_herramienta, id_epp_variante, id_concepto, unidad, nombre, cantidad, activo)
     VALUES ?`;
   await db.query(query, [movimientosData]);
 };
@@ -58,6 +58,7 @@ const getRemitosCompra = async () => {
   const [rows] = await db.query(`
     SELECT rc.*,
            p.Nombre_Prov AS nombre_proveedor,
+           p.Cuilt AS cuil_proveedor,
            m.nombre AS nombre_motivo,
            ps.NOMBRE AS nombre_solicitado,
            rs.razon_social,
@@ -80,6 +81,15 @@ const getMovimientosRemito = async (codigo) => {
   const [rows] = await db.query(`
     SELECT
       mrc.*,
+      ev.*,
+      mrc.cantidad AS cantidad,
+      mrc.nombre AS nombre,
+      ev.codigo_tipo AS codigo_tipo_epp,
+      col.nombre AS nombre_color,
+      ta.nombre AS nombre_talla,
+      ma.nombre AS nombre_marca,
+      te.tipo AS nombre_tipo_epp,
+      e.iva_compras,
       CASE
         WHEN mrc.tipo_movimiento = 'articulo' THEN a.Iva_Compras
         WHEN mrc.tipo_movimiento = 'herramienta' THEN h.IVACompras
@@ -93,9 +103,19 @@ const getMovimientosRemito = async (codigo) => {
     LEFT JOIN herramienta h
       ON mrc.id_herramienta = h.CodigoHerramienta
       AND mrc.tipo_movimiento = 'herramienta'
-    LEFT JOIN epp e
-      ON mrc.id_epp = e.codigo
+    LEFT JOIN epp_variantes ev
+      ON mrc.id_epp_variante = ev.id
       AND mrc.tipo_movimiento = 'epp'
+    LEFT JOIN epp e
+      ON ev.codigo_epp = e.codigo
+    LEFT JOIN colores col
+      ON ev.id_color = col.id
+    LEFT JOIN tallas ta
+      ON ev.id_talla = ta.id
+    LEFT JOIN marcas ma
+      ON ev.id_marca = ma.id
+    LEFT JOIN tipos_elementos te
+      ON ev.codigo_tipo = te.codigo
     WHERE mrc.codigo_remito_compra = ?
   `, [codigo]);
   return rows;
@@ -106,6 +126,7 @@ const getRemitosPorServicio = async (idServicio) => {
     SELECT
        rc.*,
        p.Nombre_Prov AS nombre_proveedor,
+           p.Cuilt AS cuil_proveedor,
        s.OBRA AS nombre_obra
      FROM remito_compra rc
      JOIN proveedor p ON rc.id_proveedor = p.Cod_Proveedor
@@ -120,6 +141,7 @@ const getRemitosSinOrden = async () => {
   const [rows] = await db.query(`
     SELECT rc.*,
            p.Nombre_Prov AS nombre_proveedor,
+           p.Cuilt AS cuil_proveedor,
            m.nombre AS nombre_motivo,
            ps.NOMBRE AS nombre_solicitado,
            rs.razon_social,
@@ -231,6 +253,7 @@ const getRemitosSinFactura = async () => {
   const [rows] = await db.query(`
     SELECT rc.*,
            p.Nombre_Prov AS nombre_proveedor,
+           p.Cuilt AS cuil_proveedor,
            m.nombre AS nombre_motivo,
            ps.NOMBRE AS nombre_solicitado,
            rs.razon_social,

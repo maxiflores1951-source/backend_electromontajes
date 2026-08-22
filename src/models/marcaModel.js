@@ -12,4 +12,9 @@ const insert = async (data) => {
   return result.insertId;
 };
 
-module.exports = { getAll, insert };
+const getById = async (id) => {
+  const [rows] = await db.query('SELECT * FROM marcas WHERE id = ?', [id]);
+  return rows[0];
+};
+
+module.exports = { getAll, getById, insert };

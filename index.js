@@ -61,8 +61,8 @@ const presupuestoRoutes = require('./src/routes/presupuestoRoutes');
 const pagosRoutes = require('./src/routes/pagosRoutes');
 const otropagosRoutes = require('./src/routes/otropagosRoutes');
 const movimientocajaRoutes = require('./src/routes/movimientocajaRoutes');
-const estadocuenta_clienteRoutes = require('./src/routes/estadocuenta_clienteRoutes');
 const reporteRoutes = require('./src/routes/reporteRoutes');
+const estadocuenta_clienteRoutes = require('./src/routes/estadocuenta_clienteRoutes');
 const reporteivaRoutes = require('./src/routes/reporteivaRoutes');
 const reporteivaventasRoutes = require('./src/routes/reporteivaventasRoutes');
 
@@ -93,6 +93,7 @@ app.use('/movimientostockh', herramientaMovimientoRoutes);
 app.use('/epp', eppRoutes);
 app.use('/billetes', billetesRoutes);
 app.use('/moneda', monedaRoutes);
+app.use('/epp-variantes', require('./src/routes/eppVarianteRoutes'));
 app.use('/motivos', motivosRoutes);
 app.use('/otrosimpuestos', otrosimpuestosRoutes);
 app.use('/razonsocial', razonsocialRoutes);

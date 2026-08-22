@@ -1,4 +1,6 @@
 const remitocompraModel = require('../models/remitocompraModel');
+const articuloService = require('./articuloService');
+const eppVarianteService = require('./eppVarianteService');
 
 const generarCodigoMovimiento = async () => {
   const ultimoCodigo = await remitocompraModel.getLastCodigo();
@@ -17,7 +19,7 @@ const generarCodigoMovimiento = async () => {
   }
 };
 
-const create = async (data) => {
+const create = async (data = {}, idUsuario) => {
   const {
     fecha_entrega,
     remito,
@@ -28,9 +30,10 @@ const create = async (data) => {
     id_movil,
     activo,
     id_razon_social,
-    item,
+    item = [],
     observacion,
-    relacion
+    relacion,
+    id_lugar
   } = data;
 
   if (!remito || !id_solicitado || !id_proveedor || !id_motivo ||
@@ -63,27 +66,75 @@ const create = async (data) => {
     observacion
   });
 
-  const movimientosData = (item || []).map(({ nombre, unidad, cantidad, tipo_operacion, id_articulo, id_herramienta, id_epp, id_concepto }) => {
-    if (!nombre || !unidad || !cantidad) {
-      throw new Error(`Datos incompletos para el item: ${JSON.stringify({ nombre, unidad, cantidad, tipo_operacion })}`);
+  // Paso 1: Hacer upsert de todas las variantes de EPP y obtener sus IDs
+  const varianteIds = [];
+  for (let i = 0; i < (item || []).length; i++) {
+    const it = item[i];
+    if (it.tipo_operacion === 'epp' && it.id_epp) {
+      try {
+        const varianteId = await eppVarianteService.upsertFromRemito({
+          id_epp: it.id_epp,
+          id_marca: it.id_marca,
+          id_color: it.id_color,
+          id_talla: it.id_talla,
+          codigo_tipo_epp: it.codigo_tipo_epp,
+          nombre: it.nombre,
+          unidad: it.unidad,
+          cantidad: it.cantidad,
+        }, idUsuario);
+        varianteIds[i] = { index: i, varianteId };
+      } catch (err) {
+        console.error('Error upserting EPP variante for item', i, err.message);
+        throw new Error(`Error al crear la variante de EPP (item ${i}, id_epp ${it.id_epp}): ${err.message}`);
+      }
+    } else {
+      varianteIds[i] = null;
     }
+  }
 
+  // Paso 2: Construir los datos de movimiento con los IDs de variante
+  const movimientosData = (item || []).map((it, index) => {
+    if (it.tipo_operacion === 'epp') {
+      const varianteInfo = varianteIds.find(v => v && v.index === index);
+      if (!varianteInfo) {
+        throw new Error(`No se pudo crear la variante de EPP para el item índice ${index} (id_epp: ${it.id_epp})`);
+      }
+      const id_epp_variante = varianteInfo.varianteId;
+      return [
+        codigoOrden,
+        'epp',
+        null,
+        null,
+        id_epp_variante,
+        it.id_concepto,
+        it.unidad,
+        it.nombre,
+        it.cantidad,
+        0
+      ];
+    }
     return [
       codigoOrden,
-      tipo_operacion,
-      tipo_operacion === 'articulo' ? id_articulo : null,
-      tipo_operacion === 'herramienta' ? id_herramienta : null,
-      tipo_operacion === 'epp' ? id_epp : null,
-      tipo_operacion === 'concepto' ? id_concepto : null,
-      unidad,
-      nombre,
-      cantidad,
+      it.tipo_operacion,
+      it.tipo_operacion === 'articulo' ? it.id_articulo : null,
+      it.tipo_operacion === 'herramienta' ? it.id_herramienta : null,
+      it.tipo_operacion === 'epp' ? 0 : null,
+      it.tipo_operacion === 'concepto' ? it.id_concepto : null,
+      it.unidad,
+      it.nombre,
+      it.cantidad,
       0
     ];
   });
 
   if (movimientosData.length > 0) {
     await remitocompraModel.insertMovimientos(codigoOrden, movimientosData);
+  }
+
+  for (const it of item || []) {
+    if (it.tipo_operacion === 'articulo' && it.id_articulo) {
+      await articuloService.ajustarStock(it.id_articulo, it.cantidad, 'Entrada', id_lugar || 'TQ');
+    }
   }
 
   if (Array.isArray(relacion) && relacion.length > 0) {
@@ -146,9 +197,10 @@ const update = async (codigo, data) => {
     id_movil,
     activo,
     id_razon_social,
-    item,
+    item = [],
     observacion,
-    relacion
+    relacion,
+    id_lugar
   } = data;
 
   if (!remito || !id_solicitado || !id_proveedor || !id_motivo ||
@@ -174,29 +226,87 @@ const update = async (codigo, data) => {
     observacion
   });
 
+  const movimientosViejos = await remitocompraModel.getMovimientosRemito(codigo);
+
+  for (const mov of movimientosViejos) {
+    if (mov.tipo_movimiento === 'articulo' && mov.id_articulo) {
+      await articuloService.ajustarStock(mov.id_articulo, mov.cantidad, 'Salida', id_lugar || 'TQ');
+    }
+  }
+
   await remitocompraModel.deleteMovimientosRemito(codigo);
 
   if (Array.isArray(item) && item.length > 0) {
-    const movimientosData = item.map(({ nombre, unidad, cantidad, tipo_operacion, id_articulo, id_herramienta, id_epp, id_concepto }) => {
-      if (!nombre || !unidad || !cantidad) {
-        throw new Error(`Datos incompletos para el item: ${JSON.stringify({ nombre, unidad, cantidad, tipo_operacion })}`);
+    const varianteIds = [];
+    for (let i = 0; i < (item || []).length; i++) {
+      const it = item[i];
+      if (it.tipo_operacion === 'epp' && it.id_epp) {
+        try {
+          const varianteId = await eppVarianteService.upsertFromRemito({
+            id_epp: it.id_epp,
+            id_marca: it.id_marca,
+            id_color: it.id_color,
+            id_talla: it.id_talla,
+            codigo_tipo_epp: it.codigo_tipo_epp,
+            nombre: it.nombre,
+            unidad: it.unidad,
+            cantidad: it.cantidad,
+          });
+          varianteIds[i] = { index: i, varianteId };
+        } catch (err) {
+          console.error('Error upserting EPP variante for item', i, err.message);
+          throw new Error(`Error al crear la variante de EPP (item ${i}, id_epp ${it.id_epp}): ${err.message}`);
+        }
+      } else {
+        varianteIds[i] = null;
+      }
+    }
+
+    const movimientosData = (item || []).map((it, index) => {
+      if (!it.nombre || !it.unidad || !it.cantidad) {
+        throw new Error(`Datos incompletos para el item: ${JSON.stringify({ nombre: it.nombre, unidad: it.unidad, cantidad: it.cantidad, tipo_operacion: it.tipo_operacion })}`);
+      }
+
+      if (it.tipo_operacion === 'epp') {
+        const varianteInfo = varianteIds.find(v => v && v.index === index);
+        if (!varianteInfo) {
+          throw new Error(`No se pudo crear la variante de EPP para el item índice ${index} (id_epp: ${it.id_epp})`);
+        }
+        return [
+          codigo,
+          'epp',
+          null,
+          null,
+          varianteInfo.varianteId,
+          it.id_concepto,
+          it.unidad,
+          it.nombre,
+          it.cantidad,
+          0
+        ];
       }
 
       return [
         codigo,
-        tipo_operacion,
-        tipo_operacion === 'articulo' ? id_articulo : null,
-        tipo_operacion === 'herramienta' ? id_herramienta : null,
-        tipo_operacion === 'epp' ? id_epp : null,
-        tipo_operacion === 'concepto' ? id_concepto : null,
-        unidad,
-        nombre,
-        cantidad,
+        it.tipo_operacion,
+        it.tipo_operacion === 'articulo' ? it.id_articulo : null,
+        it.tipo_operacion === 'herramienta' ? it.id_herramienta : null,
+        it.tipo_operacion === 'epp' ? 0 : null,
+        it.tipo_operacion === 'concepto' ? it.id_concepto : null,
+        it.unidad,
+        it.nombre,
+        it.cantidad,
         0
       ];
     });
 
     await remitocompraModel.insertMovimientos(codigo, movimientosData);
+  }
+
+  for (const it of item || []) {
+    if (it.tipo_operacion === 'articulo' && it.id_articulo) {
+      await articuloService.ajustarStock(it.id_articulo, it.cantidad, 'Entrada', id_lugar || 'TQ');
+    }
   }
 
   await remitocompraModel.deleteRelacionesRemito(codigo);

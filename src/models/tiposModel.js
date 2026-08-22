@@ -5,6 +5,12 @@ const getAll = async () => {
   return rows;
 };
 
+const getByCodigo = async (codigo) => {
+  const [rows] = await db.query('SELECT * FROM tipos_elementos WHERE codigo = ?', [codigo]);
+  return rows[0];
+};
+
 module.exports = {
   getAll,
+  getByCodigo,
 };
