@@ -65,6 +65,7 @@ const reporteRoutes = require('./src/routes/reporteRoutes');
 const estadocuenta_clienteRoutes = require('./src/routes/estadocuenta_clienteRoutes');
 const reporteivaRoutes = require('./src/routes/reporteivaRoutes');
 const reporteivaventasRoutes = require('./src/routes/reporteivaventasRoutes');
+const rolesRoutes = require('./src/routes/rolesRoutes');
 
 const app = express();
 
@@ -142,6 +143,7 @@ app.use('/estadocuentacliente', estadocuenta_clienteRoutes);
 app.use('/reporte', reporteRoutes);
 app.use('/reporteiva', reporteivaRoutes);
 app.use('/reporteivaventas', reporteivaventasRoutes);
+app.use('/roles', rolesRoutes);
 
 const PORT = process.env.PORT || 3400;
 app.listen(PORT, '0.0.0.0', () => {

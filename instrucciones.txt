@@ -1,0 +1,64 @@
+INSTRUCCIONES DE INSTALACIÓN Y EJECUCIÓN - BACKEND (Propotipo)
+================================================================
+
+Requisitos previos
+-------------------
+- Node.js (versión 18 o superior recomendada)
+- MySQL / MariaDB en ejecución (base de datos "electromontajes2")
+- Gestor de paquetes npm (viene con Node.js)
+
+Pasos para instalar
+-------------------
+1. Abrir una terminal en la carpeta del backend:
+     cd ruta\a\Propotipo\backend
+
+2. Instalar las dependencias:
+     npm install
+
+   Esto instala: bcrypt, cors, dotenv, express, express-validator,
+   jsonwebtoken y mysql2 (según package.json).
+
+Configurar las variables de entorno
+------------------------------------
+El proyecto usa un archivo ".env" para la conexión a la base de datos
+(está ignorado por git por seguridad).
+
+3. Crear un archivo llamado ".env" en la raíz del backend con este
+   contenido (ajustar según tu instalación de MySQL):
+
+     DB_HOST=localhost
+     DB_USER=root
+     DB_PASSWORD=
+     DB_NAME=electromontajes2
+     DB_PORT=3306
+     PORT=3400
+     JWT_SECRET=tu_clave_secreta_aqui
+
+   (El archivo ".env.example" fue eliminado; si no tenés el original,
+   pedilo o recrealo con los campos de arriba.)
+
+Ejecutar el servidor
+--------------------
+4. En la terminal, desde la carpeta del backend:
+
+     node index.js
+
+   El servidor arranca en http://0.0.0.0:3400 (o el PUERTO del .env).
+   Deberías ver en consola: "Servidor corriendo en http://0.0.0.0:3400".
+
+Rutas principales
+-----------------
+- Remitos de compra:        /remitocompra
+- Variantes de EPP:         /epp-variantes
+- Órdenes de compra:        /ordencompra
+- Herramientas:             /herramientas
+- Reportes:                 /reporte , /reporteiva , /reporteivaventas
+
+Notas
+-----
+- La base de datos debe existir y tener las tablas correspondientes
+  (remito_compra, movimientos_remito_compras, epp_variantes, epp, etc.).
+- Para desarrollo con recarga automática podés instalar nodemon:
+     npm install -D nodemon
+  y luego ejecutar:
+     npx nodemon index.js

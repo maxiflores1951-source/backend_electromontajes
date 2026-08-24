@@ -16,6 +16,25 @@ const generarCodigoCaja = async (connection) => {
   }
 };
 
+// Convierte fechas del frontend (dd/MM/yyyy o Date) al formato YYYY-MM-DD que espera MySQL
+const toSqlDate = (valor) => {
+  if (!valor) return valor;
+
+  if (valor instanceof Date) {
+    return valor.toISOString().slice(0, 10);
+  }
+
+  if (typeof valor === 'string') {
+    const formatoDia = valor.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (formatoDia) {
+      const [, dia, mes, anio] = formatoDia;
+      return `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+    }
+  }
+
+  return valor;
+};
+
 const create = async (data) => {
   const {
     fecha_pedido,
@@ -51,7 +70,7 @@ const create = async (data) => {
 
     await movimientocajaModel.insertCaja(connection, [
       codigoCaja,
-      fecha_pedido,
+      toSqlDate(fecha_pedido),
       id_solicitado,
       id_motivo,
       id_servicio || null,
@@ -79,7 +98,7 @@ const create = async (data) => {
         if (!codigo || !descripcion || !fecha || importe === undefined || importe === null) {
           throw new Error('Datos incompletos en formas de pago: codigo, descripcion, fecha e importe son obligatorios.');
         }
-        return [codigoCaja, codigo, descripcion, fecha, importe];
+        return [codigoCaja, codigo, descripcion, toSqlDate(fecha), importe];
       });
 
       await movimientocajaModel.insertFormasPago(connection, formasData);
@@ -207,7 +226,7 @@ const updateCaja = async (codigoCaja, data) => {
   }
 
   await movimientocajaModel.updateCaja([
-    fecha_pedido,
+    toSqlDate(fecha_pedido),
     id_solicitado,
     id_motivo,
     id_servicio || null,
@@ -232,7 +251,7 @@ const updateCaja = async (codigoCaja, data) => {
   if (Array.isArray(formasDePago)) {
     await movimientocajaModel.deleteFormasPagoCaja(codigoCaja);
     if (formasDePago.length > 0) {
-      const formasData = formasDePago.map(({ codigo, descripcion, fecha, importe }) => [codigoCaja, codigo, descripcion, fecha, importe]);
+      const formasData = formasDePago.map(({ codigo, descripcion, fecha, importe }) => [codigoCaja, codigo, descripcion, toSqlDate(fecha), importe]);
       await movimientocajaModel.insertFormasPago(db, formasData);
     }
   }
