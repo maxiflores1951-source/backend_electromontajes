@@ -215,11 +215,12 @@ const create = async (data, idPersonal) => {
     }
 
     if (otrosimpuestos && otrosimpuestos.length > 0) {
-      const impuestosData = otrosimpuestos.map(({ codigo, valor }) => {
-        if (!codigo || valor == null) {
+      const impuestosData = otrosimpuestos.map(({ codigo, codigo_impuesto, valor }) => {
+        const codigoImpuesto = codigo ?? codigo_impuesto;
+        if (!codigoImpuesto || valor == null) {
           throw new Error(`Datos incompletos para impuesto: ${JSON.stringify({ codigo, valor })}`);
         }
-        return [codigoFactura, codigo, valor];
+        return [codigoFactura, codigoImpuesto, valor];
       });
 
       await facturacompraModel.insertOtrosImpuestos(connection, impuestosData);
@@ -490,7 +491,13 @@ const update = async (codigoFactura, data) => {
     await facturacompraModel.deleteOtrosImpuestosFactura(connection, codigoFactura);
 
     if (otrosimpuestos && otrosimpuestos.length > 0) {
-      const impuestosData = otrosimpuestos.map(({ codigo, valor }) => [codigoFactura, codigo, valor]);
+      const impuestosData = otrosimpuestos.map(({ codigo, codigo_impuesto, valor }) => {
+        const codigoImpuesto = codigo ?? codigo_impuesto;
+        if (!codigoImpuesto || valor == null) {
+          throw new Error(`Datos incompletos para impuesto: ${JSON.stringify({ codigo, valor })}`);
+        }
+        return [codigoFactura, codigoImpuesto, valor];
+      });
       await facturacompraModel.insertOtrosImpuestos(connection, impuestosData);
     }
 
