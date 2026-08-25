@@ -140,6 +140,7 @@ const insertRemitoFactura = async (connection, codigoFactura, codigo) => {
 const getFacturas = async () => {
   const query = `
     SELECT fc.*,
+           DATE_FORMAT(fc.fecha, '%d/%m/%Y') AS fecha,
            p.Nombre_Prov AS nombre_proveedor,
            p.Razon_Social AS razon_social_proveedor,
            p.Cuilt AS cuit_proveedor,
@@ -187,7 +188,7 @@ const getOtrosImpuestosFactura = async (codigo) => {
 
 const getFormasPagoFactura = async (codigo) => {
   const [rows] = await db.query(`
-    SELECT fp.*, v.descripcion AS descripcion_valor
+    SELECT fp.*, DATE_FORMAT(fp.fecha, '%d/%m/%Y') AS fecha, v.descripcion AS descripcion_valor
     FROM formas_pago_factura_compra fp
     JOIN valores v ON fp.codigo_valor = v.codigo
     WHERE fp.codigo_factura_compra = ?
@@ -196,7 +197,7 @@ const getFormasPagoFactura = async (codigo) => {
 };
 
 const getFacturaByCodigo = async (codigo) => {
-  const [rows] = await db.query('SELECT * FROM factura_compra WHERE codigo = ?', [codigo]);
+  const [rows] = await db.query('SELECT *, DATE_FORMAT(fecha, \'%d/%m/%Y\') AS fecha FROM factura_compra WHERE codigo = ?', [codigo]);
   return rows;
 };
 
@@ -208,6 +209,7 @@ const anularFactura = async (codigo) => {
 const filtrarFacturas = async (desdeCompleto, hastaCompleto) => {
   const [rows] = await db.query(`
     SELECT fc.*,
+      DATE_FORMAT(fc.fecha, '%d/%m/%Y') AS fecha,
       p.Nombre_Prov AS nombre_proveedor,
       p.Cuilt AS cuil_proveedor,
       p.IDSITFISCAL AS id_fiscal_proveedor,
@@ -239,6 +241,7 @@ const filtrarFacturas = async (desdeCompleto, hastaCompleto) => {
 const filtrarNotasCredito = async (desdeCompleto, hastaCompleto) => {
   const [rows] = await db.query(`
     SELECT ncc.*,
+      DATE_FORMAT(ncc.fecha, '%d/%m/%Y') AS fecha,
       p.Nombre_Prov AS nombre_proveedor,
       p.Cuilt AS cuil_proveedor,
       p.IDSITFISCAL AS id_fiscal_proveedor,
@@ -287,7 +290,7 @@ const getOtrosImpuestosNotaCredito = async (codigo) => {
 
 const getFormasPagoNotaCredito = async (codigo) => {
   const [rows] = await db.query(`
-    SELECT fp.*, v.descripcion AS descripcion_valor
+    SELECT fp.*, DATE_FORMAT(fp.fecha, '%d/%m/%Y') AS fecha, v.descripcion AS descripcion_valor
     FROM formas_pago_nota_credito_compra fp
     JOIN valores v ON fp.codigo_valor = v.codigo
     WHERE fp.codigo_nota_credito_compra = ?
@@ -298,6 +301,7 @@ const getFormasPagoNotaCredito = async (codigo) => {
 const getFacturasPorServicio = async (idServicio) => {
   const [rows] = await db.query(`
     SELECT fc.*,
+           DATE_FORMAT(fc.fecha, '%d/%m/%Y') AS fecha,
            p.Nombre_Prov AS nombre_proveedor,
            s.OBRA AS nombre_obra,
            pc.descripcion AS nombre_plandecompra
@@ -314,6 +318,7 @@ const getFacturasPorServicio = async (idServicio) => {
 const getFacturasPendientes = async () => {
   const [rows] = await db.query(`
     SELECT fc.*,
+           DATE_FORMAT(fc.fecha, '%d/%m/%Y') AS fecha,
            p.Nombre_Prov AS nombre_proveedor,
            p.Razon_Social AS razon_social_proveedor,
            p.Cuilt AS cuit_proveedor,
@@ -403,6 +408,7 @@ const insertFacturaMovimientosUpdate = async (connection, movimientosData) => {
 const getFacturasSinPeriodoIva = async () => {
   const [rows] = await db.query(`
     SELECT fc.*,
+           DATE_FORMAT(fc.fecha, '%d/%m/%Y') AS fecha,
            p.Nombre_Prov AS nombre_proveedor,
            p.Razon_Social AS razon_social_proveedor,
            p.Cuilt AS cuit_proveedor,
@@ -432,7 +438,8 @@ const getFacturasSinPeriodoIva = async () => {
 
 const getFacturasPorProveedor = async (idProveedor, idRazonSocial) => {
   const [rows] = await db.query(`
-    SELECT *
+    SELECT *,
+           DATE_FORMAT(fc.fecha, '%d/%m/%Y') AS fecha
     FROM factura_compra fc
     WHERE fc.anulada = 0
       AND fc.saldo > 0
@@ -451,7 +458,8 @@ const getFacturasPorProveedor = async (idProveedor, idRazonSocial) => {
 
 const getNotasCreditoPorProveedor = async (idProveedor, idRazonSocial) => {
   const [rows] = await db.query(`
-    SELECT *
+    SELECT *,
+           DATE_FORMAT(ncc.fecha, '%d/%m/%Y') AS fecha
     FROM nota_credito_compra ncc
     WHERE ncc.anulada = 0
       AND ncc.saldo > 0
@@ -471,6 +479,7 @@ const getNotasCreditoPorProveedor = async (idProveedor, idRazonSocial) => {
 const getFacturasPorRazonSocial = async (idRazonSocial) => {
   const [rows] = await db.query(`
     SELECT fc.*,
+      DATE_FORMAT(fc.fecha, '%d/%m/%Y') AS fecha,
       p.Nombre_Prov AS nombre_proveedor,
       p.Razon_Social AS razon_social_proveedor,
       p.Cuilt AS cuit_proveedor,
@@ -505,6 +514,7 @@ const getFacturasPorRazonSocial = async (idRazonSocial) => {
 const getNotasCreditoPorRazonSocial = async (idRazonSocial) => {
   const [rows] = await db.query(`
     SELECT ncc.*,
+      DATE_FORMAT(ncc.fecha, '%d/%m/%Y') AS fecha,
       p.Nombre_Prov AS nombre_proveedor,
       p.Razon_Social AS razon_social_proveedor,
       p.Cuilt AS cuit_proveedor,
@@ -540,6 +550,7 @@ const getFacturasCostos = async (desdeCompleto, hastaCompleto, connection) => {
   const runner = connection || db;
   const [rows] = await runner.query(`
     SELECT fc.*,
+     DATE_FORMAT(fc.fecha, '%d/%m/%Y') AS fecha,
      p.Nombre_Prov AS nombre_proveedor,
      p.Cuilt AS cuil_proveedor,
      p.IDSITFISCAL AS id_fiscal_proveedor,
@@ -574,6 +585,7 @@ const getOtrosPagos = async (desdeCompleto, hastaCompleto, connection) => {
   const [rows] = await runner.query(`
     SELECT
       op.*,
+      DATE_FORMAT(op.fecha, '%d/%m/%Y') AS fecha,
       m.nombre AS nombre_moneda,
       mo.nombre AS nombre_motivo,
       s.OBRA AS nombre_servicio,
@@ -607,7 +619,7 @@ const getDetallesOtrosPagos = async (codigo, connection) => {
 const getFormasPagoOtrosPagos = async (codigo, connection) => {
   const runner = connection || db;
   const [rows] = await runner.query(`
-    SELECT fpop.*, v.descripcion AS valor_descripcion
+    SELECT fpop.*, DATE_FORMAT(fpop.fecha, '%d/%m/%Y') AS fecha, v.descripcion AS valor_descripcion
     FROM formas_pago_otros_pagos fpop
     LEFT JOIN valores v ON fpop.codigo_valor = v.codigo
     WHERE fpop.codigo_otros_pagos = ?
@@ -619,6 +631,7 @@ const getNotasCreditoCostos = async (desdeCompleto, hastaCompleto, connection) =
   const runner = connection || db;
   const [rows] = await runner.query(`
     SELECT nc.*,
+      DATE_FORMAT(nc.fecha, '%d/%m/%Y') AS fecha,
       p.Nombre_Prov AS nombre_proveedor,
       p.Cuilt AS cuil_proveedor,
       p.IDSITFISCAL AS id_fiscal_proveedor,
@@ -653,6 +666,7 @@ const getOrdenesPago = async (desdeCompleto, hastaCompleto, connection) => {
   const [rows] = await runner.query(`
     SELECT
       op.*,
+      DATE_FORMAT(op.fecha, '%d/%m/%Y') AS fecha,
       p.Nombre_Prov AS nombre_proveedor,
       p.Cuilt AS cuil_proveedor,
       p.IDSITFISCAL AS id_fiscal_proveedor,
@@ -682,7 +696,7 @@ const getDetalleOrdenPago = async (codigo, connection) => {
 
 const getFormasPagoOrdenPago = async (codigo, connection) => {
   const runner = connection || db;
-  const [rows] = await runner.query('SELECT * FROM formas_pago_orden_pago WHERE codigo_orden_pago = ?', [codigo]);
+  const [rows] = await runner.query('SELECT *, DATE_FORMAT(fecha, \'%d/%m/%Y\') AS fecha FROM formas_pago_orden_pago WHERE codigo_orden_pago = ?', [codigo]);
   return rows;
 };
 
@@ -701,7 +715,7 @@ const getImpuestos = async (desdeCompleto, hastaCompleto, connection) => {
   const runner = connection || db;
   const [rows] = await runner.query(`
     SELECT
-      fc.fecha AS fecha,
+      DATE_FORMAT(fc.fecha, '%d/%m/%Y') AS fecha,
       fc.codigo AS codigo_documento,
       oi.codigo AS codigo_impuesto,
       oi.nombre AS nombre_impuesto,
@@ -717,7 +731,7 @@ const getImpuestos = async (desdeCompleto, hastaCompleto, connection) => {
     UNION ALL
 
     SELECT
-      nc.fecha AS fecha,
+      DATE_FORMAT(nc.fecha, '%d/%m/%Y') AS fecha,
       nc.codigo AS codigo_documento,
       oi.codigo AS codigo_impuesto,
       oi.nombre AS nombre_impuesto,
@@ -733,7 +747,7 @@ const getImpuestos = async (desdeCompleto, hastaCompleto, connection) => {
     UNION ALL
 
     SELECT
-      r.fecha AS fecha,
+      DATE_FORMAT(r.fecha, '%d/%m/%Y') AS fecha,
       r.codigo AS codigo_documento,
       oi.codigo AS codigo_impuesto,
       oi.nombre AS nombre_impuesto,
@@ -749,7 +763,7 @@ const getImpuestos = async (desdeCompleto, hastaCompleto, connection) => {
     UNION ALL
 
     SELECT
-      op.fecha AS fecha,
+      DATE_FORMAT(op.fecha, '%d/%m/%Y') AS fecha,
       op.codigo AS codigo_documento,
       oi.codigo AS codigo_impuesto,
       oi.nombre AS nombre_impuesto,
@@ -762,7 +776,7 @@ const getImpuestos = async (desdeCompleto, hastaCompleto, connection) => {
     JOIN otros_impuestos oi ON oiop.codigo_impuesto = oi.codigo
     WHERE op.fecha BETWEEN ? AND ?
 
-    ORDER BY fecha DESC, nombre_impuesto ASC
+    ORDER BY STR_TO_DATE(fecha, '%d/%m/%Y') DESC, nombre_impuesto ASC
   `, [desdeCompleto, hastaCompleto, desdeCompleto, hastaCompleto, desdeCompleto, hastaCompleto, desdeCompleto, hastaCompleto]);
   return rows;
 };
@@ -775,7 +789,7 @@ const getRelaciones = async (factura) => {
         r.remito AS remito,
         r.factura AS factura,
         f.codigo AS codigo,
-        f.fecha AS fecha,
+        DATE_FORMAT(f.fecha, '%d/%m/%Y') AS fecha,
         f.ptoVta,
         f.NroCmp,
         f.codigoletra,
@@ -798,7 +812,7 @@ const getRelaciones = async (factura) => {
         rf.remito AS remito,
         rf.factura AS factura,
         f.codigo AS codigo,
-        f.fecha AS fecha,
+        DATE_FORMAT(f.fecha, '%d/%m/%Y') AS fecha,
         f.ptoVta,
         f.NroCmp,
         f.codigoletra,
@@ -874,7 +888,7 @@ const getCostosPorServicio = async (idServicio) => {
   const [rows] = await db.query(`
     SELECT
         fc.codigo AS codigo_factura,
-        fc.fecha AS fecha_factura,
+        DATE_FORMAT(fc.fecha, '%d/%m/%Y') AS fecha_factura,
         pc.codigo AS codigo_plan,
         pc.descripcion AS descripcion_plan,
         mfc.nombre AS nombre_movimiento,

@@ -1,5 +1,26 @@
 const facturacompraModel = require('../models/facturacompraModel');
 
+const parseFecha = (valor) => {
+  if (!valor) return 0;
+  const partes = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(valor));
+  return partes
+    ? new Date(+partes[3], partes[2] - 1, +partes[1]).getTime()
+    : new Date(valor).getTime();
+};
+
+const toMysqlFecha = (valor) => {
+  if (!valor) return valor;
+  const partes = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(valor));
+  return partes
+    ? `${partes[3]}-${partes[2].padStart(2, '0')}-${partes[1].padStart(2, '0')}`
+    : valor;
+};
+
+const extraerCodigoRelacion = (r) =>
+  typeof r === 'string'
+    ? r
+    : (r?.codigo ?? r?.codigo_orden ?? r?.codigo_remito ?? r?.orden_compra ?? r?.remito ?? null);
+
 const generarCodigoFactura = async (connection) => {
   const ultimoCodigo = await facturacompraModel.getLastCodigo(connection);
   const parte1 = 'FC00001';
@@ -66,7 +87,7 @@ const create = async (data, idPersonal) => {
 
     await facturacompraModel.insertFactura(connection, {
       codigoFactura,
-      fecha,
+      fecha: toMysqlFecha(fecha),
       tipoCmp,
       codigoletra,
       ptoVta,
@@ -205,18 +226,20 @@ const create = async (data, idPersonal) => {
     }
 
     if (formasDePago && formasDePago.length > 0) {
-      const formasPagoData = formasDePago.map(({ codigo, fecha, importe }) => {
-        if (!codigo || !fecha || importe == null) {
+      const formasPagoData = formasDePago.map(({ codigo, codigo_valor, fecha, importe }) => {
+        const codigoFormaPago = codigo ?? codigo_valor;
+        if (!codigoFormaPago || !fecha || importe == null) {
           throw new Error(`Datos incompletos para forma de pago`);
         }
-        return [codigoFactura, codigo, fecha, importe];
+        return [codigoFactura, codigoFormaPago, toMysqlFecha(fecha), importe];
       });
 
       await facturacompraModel.insertFormasPago(connection, formasPagoData);
     }
 
     if (relacion && Array.isArray(relacion)) {
-      for (const codigo of relacion) {
+      for (const elemento of relacion) {
+        const codigo = extraerCodigoRelacion(elemento);
         if (!codigo) continue;
 
         if (codigo.startsWith('OC')) {
@@ -308,7 +331,7 @@ const filtrar = async (desde, hasta) => {
   }));
 
   const todosLosDocumentos = [...facturasCompletas, ...notasCreditoCompletas]
-    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    .sort((a, b) => parseFecha(b.fecha) - parseFecha(a.fecha));
 
   return {
     desde,
@@ -398,7 +421,7 @@ const update = async (codigoFactura, data) => {
 
     if (formasDePago && formasDePago.length > 0) {
       for (const fp of formasDePago) {
-        if (fp.codigo === 'CC') {
+        if ((fp.codigo ?? fp.codigo_valor) === 'CC') {
           saldoFinal = (importe || 0) - (saldo || 0);
         }
       }
@@ -406,7 +429,7 @@ const update = async (codigoFactura, data) => {
 
     await facturacompraModel.updateFactura(connection, {
       codigoFactura,
-      fecha,
+      fecha: toMysqlFecha(fecha),
       tipoCmp,
       codigoletra,
       ptoVta,
@@ -436,7 +459,7 @@ const update = async (codigoFactura, data) => {
     if (item && item.length > 0) {
       const movimientosData = item.map(({
         tipo_operacion, id_articulo, id_concepto, id_herramienta,
-        unidad, nombre, cantidad, precio, descuento, precio_final, importe,
+        unidad, nombre, cantidad, descuento, precio_final, importe,
         codigo_orden, iva_compras, codigo_remito, cantidad_remitos, saldo
       }) => {
         return [
@@ -448,10 +471,10 @@ const update = async (codigoFactura, data) => {
           unidad,
           nombre,
           cantidad,
-          precio,
-          descuento || 0,
-          precio_final || 0,
-          importe || 0,
+          precio_final,
+          descuento ?? 0,
+          precio_final,
+          importe ?? 0,
           codigo_orden || null,
           iva_compras || 0,
           codigo_remito || null,
@@ -474,11 +497,12 @@ const update = async (codigoFactura, data) => {
     await facturacompraModel.deleteFormasPagoFactura(connection, codigoFactura);
 
     if (formasDePago && formasDePago.length > 0) {
-      const formasPagoData = formasDePago.map(({ codigo, fecha, importe }) => {
-        if (!codigo || !fecha || importe === undefined) {
+      const formasPagoData = formasDePago.map(({ codigo, codigo_valor, fecha, importe }) => {
+        const codigoFormaPago = codigo ?? codigo_valor;
+        if (!codigoFormaPago || !fecha || importe === undefined) {
           throw new Error(`Datos incompletos para forma de pago: ${JSON.stringify({ codigo, fecha, importe })}`);
         }
-        return [codigoFactura, codigo, fecha, importe];
+        return [codigoFactura, codigoFormaPago, toMysqlFecha(fecha), importe];
       });
 
       await facturacompraModel.insertFormasPago(connection, formasPagoData);
@@ -569,7 +593,7 @@ const getFacturasPorRazonSocial = async (idRazonSocial) => {
   }));
 
   const todosLosDocumentos = [...facturasCompletas, ...notasCreditoCompletas]
-    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    .sort((a, b) => parseFecha(a.fecha) - parseFecha(b.fecha));
 
   return todosLosDocumentos;
 };
