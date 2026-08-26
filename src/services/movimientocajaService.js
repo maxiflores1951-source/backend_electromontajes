@@ -35,6 +35,15 @@ const toSqlDate = (valor) => {
   return valor;
 };
 
+// El frontend puede enviar codigo/descripcion o codigo_valor/descripcion_valor
+const normalizarFormasDePago = (formasDePago = []) =>
+  formasDePago.map(({ codigo, codigo_valor, descripcion, descripcion_valor, fecha, importe }) => ({
+    codigo: codigo ?? codigo_valor,
+    descripcion: descripcion ?? descripcion_valor,
+    fecha,
+    importe,
+  }));
+
 const create = async (data) => {
   const {
     fecha_pedido,
@@ -94,7 +103,7 @@ const create = async (data) => {
     }
 
     if (Array.isArray(formasDePago) && formasDePago.length > 0) {
-      const formasData = formasDePago.map(({ codigo, descripcion, fecha, importe }) => {
+      const formasData = normalizarFormasDePago(formasDePago).map(({ codigo, descripcion, fecha, importe }) => {
         if (!codigo || !descripcion || !fecha || importe === undefined || importe === null) {
           throw new Error('Datos incompletos en formas de pago: codigo, descripcion, fecha e importe son obligatorios.');
         }
@@ -251,7 +260,7 @@ const updateCaja = async (codigoCaja, data) => {
   if (Array.isArray(formasDePago)) {
     await movimientocajaModel.deleteFormasPagoCaja(codigoCaja);
     if (formasDePago.length > 0) {
-      const formasData = formasDePago.map(({ codigo, descripcion, fecha, importe }) => [codigoCaja, codigo, descripcion, toSqlDate(fecha), importe]);
+      const formasData = normalizarFormasDePago(formasDePago).map(({ codigo, descripcion, fecha, importe }) => [codigoCaja, codigo, descripcion, toSqlDate(fecha), importe]);
       await movimientocajaModel.insertFormasPago(db, formasData);
     }
   }
