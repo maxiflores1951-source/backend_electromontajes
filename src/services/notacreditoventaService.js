@@ -108,10 +108,9 @@ const create = async (data) => {
     }
 
     if (formasDePago && formasDePago.length > 0) {
-      const formasPagoData = formasDePago.map(({ codigo, descripcion, fecha, importe }) => [
+      const formasPagoData = formasDePago.map(({ codigo_valor, fecha, importe }) => [
         codigoNotaCredito,
-        codigo,
-        descripcion,
+        codigo_valor,
         fecha,
         importe,
       ]);

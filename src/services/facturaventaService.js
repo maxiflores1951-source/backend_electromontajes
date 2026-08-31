@@ -63,7 +63,7 @@ const create = async (data) => {
     const codigoFactura = await generarCodigoFacturaVenta(connection);
 
     let saldo = 0;
-    if (formasDePago && formasDePago.some(fp => fp.codigo === 'CC')) {
+    if (formasDePago && formasDePago.some(fp => fp.codigo_valor === 'CC')) {
       saldo = importe;
     }
 
@@ -139,10 +139,9 @@ const create = async (data) => {
     }
 
     if (formasDePago && formasDePago.length > 0) {
-      const pagosData = formasDePago.map(({ codigo, descripcion, fecha, importe }) => [
+      const pagosData = formasDePago.map(({ codigo_valor, fecha, importe }) => [
         codigoFactura,
-        codigo,
-        descripcion,
+        codigo_valor,
         fecha,
         importe,
       ]);
@@ -254,10 +253,9 @@ const update = async (codigo, data) => {
     }
 
     if (formasDePago && formasDePago.length > 0) {
-      const pagosData = formasDePago.map(({ codigo: codPago, descripcion, fecha: fechaPago, importe: impPago }) => [
+      const pagosData = formasDePago.map(({ codigo_valor, fecha: fechaPago, importe: impPago }) => [
         codigo,
-        codPago || '0',
-        descripcion,
+        codigo_valor,
         fechaPago,
         impPago,
       ]);
@@ -265,7 +263,7 @@ const update = async (codigo, data) => {
     }
 
     let saldo = 0;
-    if (formasDePago && formasDePago.some(fp => fp.codigo === 'CC')) {
+    if (formasDePago && formasDePago.some(fp => fp.codigo_valor === 'CC')) {
       saldo = importe;
     }
 

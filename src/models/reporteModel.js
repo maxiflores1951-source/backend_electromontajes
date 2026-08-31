@@ -4,7 +4,7 @@ const getFormasPago = async (desdeCompleto, hastaCompleto) => {
   const query = `
     SELECT 
       fpc.codigo_caja      AS codigo_comprobante,
-      fpc.codigo           AS codigo_valor,
+      fpc.codigo_valor     AS codigo_valor,
       v.descripcion        AS descripcion_valor,
       fpc.importe,
       fpc.fecha,
@@ -13,7 +13,7 @@ const getFormasPago = async (desdeCompleto, hastaCompleto) => {
       NULL AS tipoCmp,
       'CAJA' AS origen
     FROM formas_pago_caja fpc
-    JOIN valores v ON v.codigo = fpc.codigo
+    JOIN valores v ON v.codigo = fpc.codigo_valor
     JOIN caja c ON c.codigo = fpc.codigo_caja
     WHERE fpc.fecha BETWEEN ? AND ?
 
@@ -38,7 +38,7 @@ const getFormasPago = async (desdeCompleto, hastaCompleto) => {
 
     SELECT 
       fpv.codigo_factura_venta AS codigo_comprobante,
-      fpv.codigo               AS codigo_valor,
+      fpv.codigo_valor               AS codigo_valor,
       v.descripcion            AS descripcion_valor,
       fpv.importe,
       fpv.fecha,
@@ -47,14 +47,14 @@ const getFormasPago = async (desdeCompleto, hastaCompleto) => {
       NULL AS tipoCmp,
       'FACTURA_VENTA' AS origen
     FROM formas_pago_factura_venta fpv
-    JOIN valores v ON v.codigo = fpv.codigo
+    JOIN valores v ON v.codigo = fpv.codigo_valor
     WHERE fpv.fecha BETWEEN ? AND ?
 
     UNION ALL
 
     SELECT 
       fpo.codigo_orden_pago AS codigo_comprobante,
-      fpo.codigo            AS codigo_valor,
+      fpo.codigo_valor            AS codigo_valor,
       v.descripcion         AS descripcion_valor,
       fpo.importe,
       fpo.fecha,
@@ -63,7 +63,7 @@ const getFormasPago = async (desdeCompleto, hastaCompleto) => {
       NULL AS tipoCmp,
       'ORDEN_PAGO' AS origen
     FROM formas_pago_orden_pago fpo
-    JOIN valores v ON v.codigo = fpo.codigo
+    JOIN valores v ON v.codigo = fpo.codigo_valor
     WHERE fpo.fecha BETWEEN ? AND ?
 
     UNION ALL

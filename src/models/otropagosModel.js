@@ -106,7 +106,7 @@ const getDetalles = async (connection, codigo) => {
 
 const getFormasPago = async (connection, codigo) => {
   const query = `
-    SELECT fpop.*, v.descripcion AS valor_descripcion
+    SELECT fpop.*, v.descripcion AS descripcion_valor
     FROM formas_pago_otros_pagos fpop
       LEFT JOIN valores v ON fpop.codigo_valor = v.codigo
     WHERE fpop.codigo_otros_pagos = ?

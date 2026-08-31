@@ -84,7 +84,7 @@ const insertOtrosImpuestos = async (connection, otrosImpuestosData) => {
 const insertFormasPago = async (connection, formasPagoData) => {
   const query = `
     INSERT INTO formas_pago_nota_credito_venta (
-      codigo_nota_credito_venta, codigo, descripcion, fecha, importe
+      codigo_nota_credito_venta, codigo_valor, fecha, importe
     ) VALUES ?
   `;
   const exec = connection ? connection.query.bind(connection) : db.query;
@@ -176,7 +176,7 @@ const getFormasPago = async (codigo) => {
   const query = `
     SELECT fp.*, v.descripcion AS descripcion_valor
     FROM formas_pago_nota_credito_venta fp
-    JOIN valores v ON fp.codigo = v.codigo
+    JOIN valores v ON fp.codigo_valor = v.codigo
     WHERE fp.codigo_nota_credito_venta = ?
   `;
   const [rows] = await db.query(query, [codigo]);

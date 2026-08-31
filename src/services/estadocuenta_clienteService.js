@@ -75,8 +75,8 @@ const estructurarDatos = (rows) => {
         if (!fpExiste) {
           factura.formas_pago.push({
             id: row.forma_pago_id,
-            codigo: row.forma_pago_codigo,
-            descripcion: row.forma_pago_descripcion,
+            codigo_valor: row.codigo_valor,
+            descripcion_valor: row.descripcion_valor,
             fecha: row.forma_pago_fecha,
             importe: parseFloat(row.forma_pago_importe),
           });

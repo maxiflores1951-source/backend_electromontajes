@@ -41,8 +41,8 @@ const getPresupuestosCompleto = async (clienteId) => {
       dfv.iva as factura_detalle_iva,
 
       fp.id as forma_pago_id,
-      fp.codigo as forma_pago_codigo,
-      fp.descripcion as forma_pago_descripcion,
+      fp.codigo_valor as codigo_valor,
+      v.descripcion as descripcion_valor,
       fp.fecha as forma_pago_fecha,
       fp.importe as forma_pago_importe,
 
@@ -75,6 +75,7 @@ const getPresupuestosCompleto = async (clienteId) => {
     LEFT JOIN detalle_factura_venta dfv ON p.codigo = dfv.codigo_presupuesto
     LEFT JOIN factura_venta fv ON dfv.codigo_factura_venta = fv.codigo
     LEFT JOIN formas_pago_factura_venta fp ON fv.codigo = fp.codigo_factura_venta
+    LEFT JOIN valores v ON v.codigo = fp.codigo_valor
     LEFT JOIN detalle_recibo dr ON fv.codigo = dr.codigo_factura_venta
     LEFT JOIN recibo r ON dr.codigo_recibo = r.codigo
     

@@ -69,11 +69,11 @@ const create = async (data, idResponsable) => {
     }
 
     if (formasDePago && formasDePago.length > 0) {
-      const formasPagoData = formasDePago.map(({ codigo, fecha, importe }) => {
-        if (!codigo || !fecha || importe === undefined) {
-          throw new Error(`Datos incompletos en forma de pago: ${JSON.stringify({ codigo, fecha, importe })}`);
+      const formasPagoData = formasDePago.map(({ codigo_valor, fecha, importe }) => {
+        if (!codigo_valor || !fecha || importe === undefined) {
+          throw new Error(`Datos incompletos en forma de pago: ${JSON.stringify({ codigo_valor, fecha, importe })}`);
         }
-        return [codigoOtrosPagos, codigo, fecha, importe];
+        return [codigoOtrosPagos, codigo_valor, fecha, importe];
       });
 
       await otropagosModel.insertFormasPago(connection, formasPagoData);

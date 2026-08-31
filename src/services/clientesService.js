@@ -71,17 +71,9 @@ const getVentasCliente = async (id) => {
               facturas.map(async (factura) => {
                 const formasPago = await clientesModel.getFormasPagoFactura(connection, factura.codigo);
 
-                let formaPagoPrincipal = 'No Especificado';
-                if (formasPago.length > 0) {
-                  const primeraFormaPago = formasPago[0].codigo;
-                  formaPagoPrincipal =
-                    primeraFormaPago === 'CC' ? 'Cuenta Corriente' :
-                    primeraFormaPago === 'TR' ? 'Transferencia' :
-                    primeraFormaPago === 'EF' ? 'Efectivo' :
-                    primeraFormaPago === 'CH' ? 'Cheque' :
-                    primeraFormaPago === 'TC' ? 'Tarjeta Crédito' :
-                    'No Especificado';
-                }
+                const formaPagoPrincipal = formasPago.length > 0
+                  ? formasPago[0].descripcion_valor
+                  : 'No Especificado';
 
                 const recibos = await clientesModel.getRecibosFactura(connection, factura.codigo);
 
@@ -92,8 +84,8 @@ const getVentasCliente = async (id) => {
                   monto: parseFloat(factura.monto),
                   formaPago: formaPagoPrincipal,
                   formasPagoDetalle: formasPago.map(fp => ({
-                    codigo: fp.codigo,
-                    descripcion: fp.descripcion,
+                    codigo_valor: fp.codigo_valor,
+                    descripcion_valor: fp.descripcion_valor,
                     fecha: fp.fecha,
                     monto: parseFloat(fp.monto)
                   })),

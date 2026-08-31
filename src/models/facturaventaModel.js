@@ -112,7 +112,7 @@ const insertOtrosImpuestos = async (connection, impuestosData) => {
 const insertFormasPago = async (connection, pagosData) => {
   const query = `
     INSERT INTO formas_pago_factura_venta (
-      codigo_factura_venta, codigo, descripcion, fecha, importe
+      codigo_factura_venta, codigo_valor, fecha, importe
     ) VALUES ?
   `;
   const exec = connection ? connection.query.bind(connection) : db.query;
@@ -241,7 +241,7 @@ const getFormasPago = async (codigo) => {
   const query = `
     SELECT fp.*, v.descripcion AS descripcion_valor
     FROM formas_pago_factura_venta fp
-    JOIN valores v ON fp.codigo = v.codigo
+    JOIN valores v ON fp.codigo_valor = v.codigo
     WHERE fp.codigo_factura_venta = ?
   `;
   const [rows] = await db.query(query, [codigo]);
@@ -356,7 +356,7 @@ const getByClienteYRazonSocial = async (idCliente, idRazonSocial) => {
     WHERE fv.id_cliente = ?
       AND fv.id_razonsocial = ?
       AND fv.estado = 0
-      AND fp.codigo = 'CC'
+      AND fp.codigo_valor = 'CC'
     ORDER BY fv.fecha ASC
   `;
   const [rows] = await db.query(query, [idCliente, idRazonSocial]);
@@ -415,7 +415,7 @@ const getFormasPagoNotaCredito = async (codigo) => {
   const query = `
     SELECT fp.*, v.descripcion AS descripcion_valor
     FROM formas_pago_nota_credito_venta fp
-    JOIN valores v ON fp.codigo = v.codigo
+    JOIN valores v ON fp.codigo_valor = v.codigo
     WHERE fp.codigo_nota_credito_venta = ?
   `;
   const [rows] = await db.query(query, [codigo]);
@@ -438,7 +438,7 @@ const getCalendario = async () => {
     JOIN moneda mon ON fv.moneda = mon.codigo
     JOIN tipocomprobante tc ON fv.tipoCmp = tc.codigo
     JOIN formas_pago_factura_venta fp ON fv.codigo = fp.codigo_factura_venta
-    WHERE fp.codigo = 'CC'
+    WHERE fp.codigo_valor = 'CC'
       AND fv.saldo <> 0
     ORDER BY fv.codigo DESC
   `;

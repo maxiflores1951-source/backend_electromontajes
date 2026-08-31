@@ -87,9 +87,10 @@ const getDetalleFactura = async (codigoFactura) => {
 
 const getFormasPago = async (codigoFactura) => {
   const query = `
-    SELECT id, codigo_factura_venta, codigo, descripcion, fecha, importe
-    FROM formas_pago_factura_venta
-    WHERE codigo_factura_venta = ?
+    SELECT fp.id, fp.codigo_factura_venta, fp.codigo_valor, v.descripcion AS descripcion_valor, fp.fecha, fp.importe
+    FROM formas_pago_factura_venta fp
+    JOIN valores v ON v.codigo = fp.codigo_valor
+    WHERE fp.codigo_factura_venta = ?
   `;
   const [rows] = await db.query(query, [codigoFactura]);
   return rows;

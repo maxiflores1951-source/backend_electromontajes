@@ -31,7 +31,7 @@ const insertMovimientos = async (connection, data) => {
 
 const insertFormasPago = async (connection, data) => {
   const query = `
-    INSERT INTO formas_pago_caja (codigo_caja, codigo, descripcion, fecha, importe) VALUES ?
+    INSERT INTO formas_pago_caja (codigo_caja, codigo_valor, fecha, importe) VALUES ?
   `;
   await connection.query(query, [data]);
 };
@@ -63,9 +63,10 @@ const getMovimientos = async (codigoCaja) => {
 
 const getFormasDePago = async (codigoCaja) => {
   const query = `
-    SELECT codigo, descripcion, fecha, importe 
-    FROM formas_pago_caja 
-    WHERE codigo_caja = ?
+    SELECT fpc.codigo_valor, v.descripcion AS descripcion_valor, fpc.fecha, fpc.importe 
+    FROM formas_pago_caja fpc
+    JOIN valores v ON v.codigo = fpc.codigo_valor
+    WHERE fpc.codigo_caja = ?
   `;
   const [rows] = await db.query(query, [codigoCaja]);
   return rows;

@@ -148,17 +148,17 @@ const create = async (data, idPersonal) => {
     }
 
     if (formasDePago && formasDePago.length > 0) {
-      const formasPagoData = formasDePago.map(({ codigo, fecha, importe, saldo }) => {
-        if (!codigo || !fecha || importe === undefined) {
-          throw new Error(`Datos incompletos para forma de pago: ${JSON.stringify({ codigo, fecha, importe })}`);
+      const formasPagoData = formasDePago.map(({ codigo_valor, fecha, importe, saldo }) => {
+        if (!codigo_valor || !fecha || importe === undefined) {
+          throw new Error(`Datos incompletos para forma de pago: ${JSON.stringify({ codigo_valor, fecha, importe })}`);
         }
 
         let saldoFinal = saldo ?? 0;
-        if (codigo === 'CC') {
+        if (codigo_valor === 'CC') {
           saldoFinal = importe;
         }
 
-        return [codigoNotaCredito, codigo, fecha, importe];
+        return [codigoNotaCredito, codigo_valor, fecha, importe];
       });
 
       await notacreditocompraModel.insertFormasPago(connection, codigoNotaCredito, formasPagoData);

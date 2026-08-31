@@ -103,11 +103,12 @@ const getFacturasPresupuesto = async (connection, codigoPresupuesto) => {
 const getFormasPagoFactura = async (connection, codigoFactura) => {
   const query = `
     SELECT 
-      fp.codigo,
-      fp.descripcion,
+      fp.codigo_valor,
+      v.descripcion AS descripcion_valor,
       DATE_FORMAT(fp.fecha, '%d/%m/%Y') AS fecha,
       fp.importe AS monto
     FROM formas_pago_factura_venta fp
+    JOIN valores v ON v.codigo = fp.codigo_valor
     WHERE fp.codigo_factura_venta = ?
     ORDER BY fp.fecha ASC
   `;

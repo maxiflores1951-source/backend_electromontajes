@@ -60,7 +60,7 @@ const insertOtrosImpuestos = async (connection, data) => {
 const insertFormasPago = async (connection, data) => {
   const query = `
     INSERT INTO formas_pago_orden_pago
-    (codigo_orden_pago, codigo, fecha, importe)
+    (codigo_orden_pago, codigo_valor, fecha, importe)
     VALUES ?
   `;
   await connection.query(query, [data]);
@@ -164,13 +164,13 @@ const getImpuestosByOrdenPago = async (connection, codigoOrdenPago) => {
 const getFormasPagoByOrdenPago = async (connection, codigoOrdenPago) => {
   const query = `
     SELECT 
-      fpop.codigo AS codigo_valor,
+      fpop.codigo_valor,
       v.descripcion,
       fpop.fecha,
       fpop.importe
     FROM formas_pago_orden_pago fpop
     JOIN valores v 
-      ON v.codigo = fpop.codigo
+      ON v.codigo = fpop.codigo_valor
     WHERE fpop.codigo_orden_pago = ?
   `;
   const [rows] = await connection.query(query, [codigoOrdenPago]);
@@ -247,12 +247,12 @@ const getImpuestosByPago = async (codigo) => {
 const getFormasPagoByPago = async (codigo) => {
   const query = `
     SELECT 
-      fpop.codigo AS codigo_valor,
+      fpop.codigo_valor,
       v.descripcion,
       fpop.fecha,
       fpop.importe
     FROM formas_pago_orden_pago fpop
-    JOIN valores v ON v.codigo = fpop.codigo
+    JOIN valores v ON v.codigo = fpop.codigo_valor
     WHERE fpop.codigo_orden_pago = ?
   `;
   const [rows] = await db.query(query, [codigo]);
