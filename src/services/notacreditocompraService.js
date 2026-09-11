@@ -87,7 +87,7 @@ const create = async (data, idPersonal) => {
       periodoiva,
       importe,
       observacion,
-      estado,
+      estado: 'Completa',
       saldoFinal,
       id_factura_compra
     });
@@ -137,11 +137,12 @@ const create = async (data, idPersonal) => {
     }
 
     if (otrosimpuestos && otrosimpuestos.length > 0) {
-      const impuestosData = otrosimpuestos.map(({ codigo, valor }) => {
-        if (!codigo || valor === undefined) {
+      const impuestosData = otrosimpuestos.map(({ codigo, codigo_impuesto, valor }) => {
+        const codigoImpuesto = codigo ?? codigo_impuesto;
+        if (!codigoImpuesto || valor === undefined) {
           throw new Error(`Datos incompletos para impuesto: ${JSON.stringify({ codigo, valor })}`);
         }
-        return [codigoNotaCredito, codigo, valor];
+        return [codigoNotaCredito, codigoImpuesto, valor];
       });
 
       await notacreditocompraModel.insertOtrosImpuestos(connection, codigoNotaCredito, impuestosData);

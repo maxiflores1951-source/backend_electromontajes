@@ -101,12 +101,12 @@ const getNotasCredito = async () => {
            fc.fecha AS factura_fecha,
            fc.NroCmp AS factura_nro_comprobante
     FROM nota_credito_compra ncc
-    JOIN proveedor p ON ncc.id_proveedor = p.Cod_Proveedor
-    JOIN motivos m ON ncc.id_motivo = m.codigo
-    JOIN plandecompra pl ON ncc.id_plancompra = pl.codigo
-    JOIN razones_sociales rs ON ncc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON ncc.tipoCmp = tc.codigo
-    JOIN moneda mon ON ncc.moneda = mon.codigo
+    LEFT JOIN proveedor p ON ncc.id_proveedor = p.Cod_Proveedor
+    LEFT JOIN motivos m ON ncc.id_motivo = m.codigo
+    LEFT JOIN plandecompra pl ON ncc.id_plancompra = pl.codigo
+    LEFT JOIN razones_sociales rs ON ncc.id_razonsocial = rs.id
+    LEFT JOIN tipocomprobante tc ON ncc.tipoCmp = tc.codigo
+    LEFT JOIN moneda mon ON ncc.moneda = mon.codigo
     LEFT JOIN servicios s ON ncc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON ncc.id_movil = mv.nro_ident
     LEFT JOIN factura_compra fc ON ncc.id_factura_compra = fc.codigo
