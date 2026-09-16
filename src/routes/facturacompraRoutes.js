@@ -22,5 +22,6 @@ router.post('/factura', facturacompraController.crearRelacionFactura);
 router.get('/indicadores-forma-pago', facturacompraController.getIndicadoresFormaPago);
 router.delete('/factura', facturacompraController.eliminarRelacionFactura);
 router.get('/costos-servicio/:idServicio', facturacompraController.getCostosPorServicio);
+router.get('/saldos-proveedor', facturacompraController.getSaldosPorProveedor);
 
 module.exports = router;

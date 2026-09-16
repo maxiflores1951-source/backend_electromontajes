@@ -862,6 +862,10 @@ const getCostosPorServicio = async (idServicio) => {
   return await facturacompraModel.getCostosPorServicio(idServicio);
 };
 
+const getSaldosPorProveedor = async (idRazonSocial) => {
+  return await facturacompraModel.getSaldosPorProveedor(idRazonSocial);
+};
+
 module.exports = {
   create,
   getAll,
@@ -881,4 +885,5 @@ module.exports = {
   getIndicadoresFormaPago,
   eliminarRelacionFactura,
   getCostosPorServicio,
+  getSaldosPorProveedor,
 };

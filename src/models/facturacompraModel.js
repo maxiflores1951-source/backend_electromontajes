@@ -919,6 +919,32 @@ const getTotalesSaldo = async () => {
   return totales;
 };
 
+const getSaldosPorProveedor = async (idRazonSocial) => {
+  const [rows] = await db.query(`
+    SELECT
+      p.Cod_Proveedor AS id_proveedor,
+      p.Nombre_Prov AS nombre_proveedor,
+      p.Razon_Social AS razon_social_proveedor,
+      p.Cuilt AS cuit_proveedor,
+      SUM(fc.saldo) AS monto_total
+    FROM factura_compra fc
+    JOIN proveedor p ON fc.id_proveedor = p.Cod_Proveedor
+    JOIN razones_sociales rs ON fc.id_razonsocial = rs.id
+    WHERE fc.anulada = 0
+      AND fc.saldo > 0
+      AND fc.id_razonsocial = ?
+      AND EXISTS (
+        SELECT 1
+        FROM formas_pago_factura_compra fpf
+        WHERE fpf.codigo_factura_compra = fc.codigo
+          AND fpf.codigo_valor = 'CC'
+      )
+    GROUP BY p.Cod_Proveedor, p.Nombre_Prov, p.Razon_Social, p.Cuilt
+    ORDER BY monto_total DESC
+  `, [idRazonSocial]);
+  return rows;
+};
+
 const deleteRelacionOrdenFactura = async (codigo, factura) => {
   const [result] = await db.query('DELETE FROM remito_orden WHERE orden_compra = ? AND factura = ?', [codigo, factura]);
   return result.affectedRows;
@@ -1005,6 +1031,7 @@ module.exports = {
   insertRelacionFacturaRemito,
   getIndicadoresFormaPago,
   getTotalesSaldo,
+  getSaldosPorProveedor,
   deleteRelacionOrdenFactura,
   deleteRelacionRemitoFactura,
   getCostosPorServicio,

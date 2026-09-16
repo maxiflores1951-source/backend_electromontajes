@@ -245,6 +245,17 @@ const getCostosPorServicio = async (req, res) => {
   }
 };
 
+const getSaldosPorProveedor = async (req, res) => {
+  const idRazonSocial = req.query.id_razon_social;
+  try {
+    const resultado = await facturacompraService.getSaldosPorProveedor(idRazonSocial);
+    res.json(resultado);
+  } catch (error) {
+    console.error('Error al obtener saldos por proveedor:', error);
+    res.status(500).json({ error: 'Error al obtener saldos por proveedor', details: error.message });
+  }
+};
+
 module.exports = {
   create,
   getAll,
@@ -264,4 +275,5 @@ module.exports = {
   getIndicadoresFormaPago,
   eliminarRelacionFactura,
   getCostosPorServicio,
+  getSaldosPorProveedor,
 };
