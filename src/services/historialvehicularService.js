@@ -2,9 +2,10 @@ const db = require('../../db');
 const historialvehicularModel = require('../models/historialvehicularModel');
 
 const generarCodigoHistorial = async (connection) => {
-  const result = await historialvehicularModel.getLastCodigo(connection);
-
-  const ultimoCodigo = result.length > 0 ? result[0].ultimo : null;
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM historial_vehicular FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const parte1 = 'HV00001';
 
   if (!ultimoCodigo) {
@@ -12,10 +13,8 @@ const generarCodigoHistorial = async (connection) => {
   } else {
     const partes = ultimoCodigo.split('-');
     const parte2 = partes.length > 1 ? partes[1] : '00000000';
-
     const numero = parseInt(parte2, 10);
     const nuevoNumero = isNaN(numero) ? 1 : numero + 1;
-
     return `${parte1}-${nuevoNumero.toString().padStart(8, '0')}`;
   }
 };
@@ -37,6 +36,9 @@ const create = async (data, idPersonal) => {
   } = data;
 
   const connection = await db.getConnection();
+  let codigoHistorial;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
 
   try {
     await connection.beginTransaction();
@@ -45,7 +47,36 @@ const create = async (data, idPersonal) => {
       throw new Error('Faltan datos obligatorios en el historial vehicular');
     }
 
-    const codigoHistorial = await generarCodigoHistorial(connection);
+    while (intentos < MAX_INTENTOS) {
+      codigoHistorial = await generarCodigoHistorial(connection);
+      try {
+        await historialvehicularModel.insertHistorial(connection, [
+          codigoHistorial,
+          fecha,
+          descripcion,
+          causa || null,
+          id_movil,
+          id_proveedor,
+          id_responsable || null,
+          kilometraje || null,
+          horometro || null,
+          observacion || null,
+          importeTotal,
+          idPersonal || null,
+        ]);
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     let importeTotal = 0;
 

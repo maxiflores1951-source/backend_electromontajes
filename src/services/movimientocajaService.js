@@ -2,7 +2,10 @@ const movimientocajaModel = require('../models/movimientocajaModel');
 const db = require('../../db');
 
 const generarCodigoCaja = async (connection) => {
-  const ultimoCodigo = await movimientocajaModel.getLastCodigo(connection);
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM caja FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const parte1 = 'CC00001';
 
   if (!ultimoCodigo) {
@@ -58,29 +61,48 @@ const create = async (data) => {
   const estado = op === 'egreso' ? 1 : 0;
 
   const connection = await db.getConnection();
+  let codigoCaja;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
+
   try {
     await connection.beginTransaction();
 
-    const codigoCaja = await generarCodigoCaja(connection);
+    while (intentos < MAX_INTENTOS) {
+      codigoCaja = await generarCodigoCaja(connection);
+      try {
+        const existeCaja = await movimientocajaModel.cajaExists(connection, codigoCaja);
+        if (existeCaja.length > 0) {
+          intentos++;
+          continue;
+        }
 
-    const existeCaja = await movimientocajaModel.cajaExists(connection, codigoCaja);
-    if (existeCaja.length > 0) {
-      throw new Error('El código generado ya existe. Intenta nuevamente.');
+        await movimientocajaModel.insertCaja(connection, [
+          codigoCaja,
+          toSqlDate(fecha_pedido),
+          id_solicitado,
+          id_motivo,
+          id_servicio || null,
+          id_movil || null,
+          operacion || null,
+          observacion || null,
+          importe || 0,
+          estado,
+          plazo_rendicion ? 1 : 0,
+        ]);
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
     }
 
-    await movimientocajaModel.insertCaja(connection, [
-      codigoCaja,
-      toSqlDate(fecha_pedido),
-      id_solicitado,
-      id_motivo,
-      id_servicio || null,
-      id_movil || null,
-      operacion || null,
-      observacion || null,
-      importe || 0,
-      estado,
-      plazo_rendicion ? 1 : 0,
-    ]);
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     if (Array.isArray(movimientos) && movimientos.length > 0) {
       const movimientosData = movimientos.map(({ detalle, importe }) => {

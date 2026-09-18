@@ -1,5 +1,6 @@
 const db = require('../../db');
 const clientesModel = require('../models/clientesModel');
+const contactoclienteModel = require('../models/contactoclienteModel');
 
 const getAll = async () => {
   const rows = await clientesModel.getAll();
@@ -35,6 +36,34 @@ const getAll = async () => {
   return Object.values(clientes);
 };
 
+const syncContactos = async (connection, clienteId, contactos, idPersonal) => {
+  if (!Array.isArray(contactos)) return;
+
+  const existing = await contactoclienteModel.getByCliente(clienteId, connection);
+  const existingIds = new Set(existing.map((c) => c.id_contacto));
+  const incomingIds = new Set(contactos.filter((c) => c.id_contacto > 0).map((c) => c.id_contacto));
+
+  const idsToDelete = [...existingIds].filter((id) => !incomingIds.has(id));
+  if (idsToDelete.length > 0) {
+    await contactoclienteModel.removeByIds(idsToDelete, connection);
+  }
+
+  for (const contacto of contactos) {
+    if (contacto.id_contacto > 0 && existingIds.has(contacto.id_contacto)) {
+      await contactoclienteModel.update(
+        contacto.id_contacto,
+        { ...contacto, id_modificado: idPersonal },
+        connection,
+      );
+    } else {
+      await contactoclienteModel.insert(
+        { ...contacto, id_cliente: clienteId, id_creado: idPersonal },
+        connection,
+      );
+    }
+  }
+};
+
 const create = async (data) => {
   const { DENOMINACION } = data;
 
@@ -42,8 +71,54 @@ const create = async (data) => {
     throw new Error('Los campos DENOMINACION, IDSITFISCAL y CUIT son obligatorios');
   }
 
-  const clienteId = await clientesModel.insert(data);
-  return clienteId;
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const clienteId = await clientesModel.insert(data, connection);
+    await syncContactos(connection, clienteId, data.contactos, null);
+
+    await connection.commit();
+    return clienteId;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+};
+
+const update = async (id, data) => {
+  if (!id) {
+    throw new Error('Falta el ID del cliente a modificar');
+  }
+
+  const { DENOMINACION } = data;
+
+  if (!DENOMINACION) {
+    throw new Error('Los campos DENOMINACION, IDSITFISCAL y CUIT son obligatorios');
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const existe = await clientesModel.existsById(id, connection);
+    if (!existe) {
+      throw new Error('Cliente no encontrado');
+    }
+
+    const affected = await clientesModel.updateById(id, data, connection);
+    await syncContactos(connection, id, data.contactos, data.id_modificado ?? null);
+
+    await connection.commit();
+    return affected;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 };
 
 const getVentasCliente = async (id) => {
@@ -156,6 +231,7 @@ const getEstadosObra = async () => {
 module.exports = {
   getAll,
   create,
+  update,
   getVentasCliente,
   getById,
   getEstadosObra,

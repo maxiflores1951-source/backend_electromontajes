@@ -1,8 +1,11 @@
 const reporteivaModel = require('../models/reporteivaModel');
 const db = require('../../db');
 
-const generarCodigoReporteIVA = async () => {
-  const ultimoCodigo = await reporteivaModel.getLastCodigo();
+const generarCodigoReporteIVA = async (connection) => {
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM reporte_iva FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const parte1 = 'RI00001';
 
   if (!ultimoCodigo) {
@@ -32,20 +35,38 @@ const create = async (data) => {
   }
 
   const connection = await db.getConnection();
+  let codigoReporte;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
+
   try {
     await connection.beginTransaction();
 
-    const codigoReporte = await generarCodigoReporteIVA();
+    while (intentos < MAX_INTENTOS) {
+      codigoReporte = await generarCodigoReporteIVA(connection);
+      try {
+        await reporteivaModel.insertReporteIva(connection, [
+          codigoReporte,
+          periodo,
+          importe_total || 0,
+          iva21 || 0,
+          iva27 || 0,
+          iva10 || 0,
+          id_razonsocial,
+        ]);
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    await reporteivaModel.insertReporteIva(connection, [
-      codigoReporte,
-      periodo,
-      importe_total || 0,
-      iva21 || 0,
-      iva27 || 0,
-      iva10 || 0,
-      id_razonsocial,
-    ]);
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     const movimientos = items.map(codigo => {
       if (codigo.startsWith('FC')) {

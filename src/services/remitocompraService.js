@@ -1,21 +1,28 @@
 const remitocompraModel = require('../models/remitocompraModel');
 const articuloService = require('./articuloService');
 const eppVarianteService = require('./eppVarianteService');
+const db = require('../../db');
 
 const generarCodigoMovimiento = async () => {
-  const ultimoCodigo = await remitocompraModel.getLastCodigo();
-  const parte1 = 'RC00001';
+  const connection = await db.getConnection();
+  try {
+    const [rows] = await connection.query(
+      'SELECT MAX(codigo) AS ultimo FROM remito_compra FOR UPDATE'
+    );
+    const ultimoCodigo = rows[0]?.ultimo;
+    const parte1 = 'RC00001';
 
-  if (!ultimoCodigo) {
-    return `${parte1}-00000001`;
-  } else {
-    const partes = ultimoCodigo.split('-');
-    const parte2 = partes.length > 1 ? partes[1] : '00000000';
-
-    const numero = parseInt(parte2, 10);
-    const nuevoNumero = isNaN(numero) ? 1 : numero + 1;
-
-    return `${parte1}-${nuevoNumero.toString().padStart(8, '0')}`;
+    if (!ultimoCodigo) {
+      return `${parte1}-00000001`;
+    } else {
+      const partes = ultimoCodigo.split('-');
+      const parte2 = partes.length > 1 ? partes[1] : '00000000';
+      const numero = parseInt(parte2, 10);
+      const nuevoNumero = isNaN(numero) ? 1 : numero + 1;
+      return `${parte1}-${nuevoNumero.toString().padStart(8, '0')}`;
+    }
+  } finally {
+    connection.release();
   }
 };
 
@@ -45,26 +52,47 @@ const create = async (data = {}, idUsuario) => {
     throw new Error('El campo "activo" debe ser 0 o 1.');
   }
 
-  const codigoOrden = await generarCodigoMovimiento();
+  let codigoOrden = await generarCodigoMovimiento();
 
   const existeRemito = await remitocompraModel.getRemitoByCodigo(codigoOrden);
   if (existeRemito.length > 0) {
     return { codigoOrden, existe: true };
   }
 
-  await remitocompraModel.insertRemito({
-    codigoOrden,
-    remito,
-    fecha_entrega,
-    id_solicitado,
-    id_proveedor,
-    id_motivo,
-    id_servicio,
-    id_movil,
-    activo,
-    id_razon_social,
-    observacion
-  });
+  try {
+    await remitocompraModel.insertRemito({
+      codigoOrden,
+      remito,
+      fecha_entrega,
+      id_solicitado,
+      id_proveedor,
+      id_motivo,
+      id_servicio,
+      id_movil,
+      activo,
+      id_razon_social,
+      observacion
+    });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      codigoOrden = await generarCodigoMovimiento();
+      await remitocompraModel.insertRemito({
+        codigoOrden,
+        remito,
+        fecha_entrega,
+        id_solicitado,
+        id_proveedor,
+        id_motivo,
+        id_servicio,
+        id_movil,
+        activo,
+        id_razon_social,
+        observacion
+      });
+    } else {
+      throw err;
+    }
+  }
 
   // Paso 1: Hacer upsert de todas las variantes de EPP y obtener sus IDs
   const varianteIds = [];

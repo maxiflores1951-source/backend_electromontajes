@@ -5,8 +5,9 @@ const getAll = async () => {
   return rows;
 };
 
-const getByCliente = async (idCliente) => {
-  const [rows] = await db.query('SELECT * FROM contacto_clientes WHERE id_cliente = ?', [idCliente]);
+const getByCliente = async (idCliente, connection) => {
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  const [rows] = await exec('SELECT * FROM contacto_clientes WHERE id_cliente = ?', [idCliente]);
   return rows;
 };
 
@@ -15,29 +16,40 @@ const getById = async (idContacto) => {
   return rows;
 };
 
-const insert = async (data) => {
-  const { id_cliente, nombre, puesto, telefono, email } = data;
+const insert = async (data, connection) => {
+  const { id_cliente, nombre, puesto, telefono, email, id_creado } = data;
   const query = `
     INSERT INTO contacto_clientes 
-    (id_cliente, nombre, puesto, telefono, email) 
-    VALUES (?, ?, ?, ?, ?)
+    (id_cliente, nombre, puesto, telefono, email, id_creado) 
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
-  const [result] = await db.query(query, [id_cliente, nombre, puesto || null, telefono || null, email || null]);
+  const values = [id_cliente, nombre, puesto || null, telefono || null, email || null, id_creado || null];
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  const [result] = await exec(query, values);
   return result.insertId;
 };
 
-const update = async (idContacto, data) => {
-  const { nombre, puesto, telefono, email } = data;
+const update = async (idContacto, data, connection) => {
+  const { nombre, puesto, telefono, email, id_modificado } = data;
   const query = `
     UPDATE contacto_clientes 
-    SET nombre = ?, puesto = ?, telefono = ?, email = ? 
+    SET nombre = ?, puesto = ?, telefono = ?, email = ?, id_modificado = ? 
     WHERE id_contacto = ?
   `;
-  await db.query(query, [nombre, puesto || null, telefono || null, email || null, idContacto]);
+  const values = [nombre, puesto || null, telefono || null, email || null, id_modificado || null, idContacto];
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  await exec(query, values);
 };
 
 const remove = async (idContacto) => {
   await db.query('DELETE FROM contacto_clientes WHERE id_contacto = ?', [idContacto]);
+};
+
+const removeByIds = async (ids, connection) => {
+  if (!ids || ids.length === 0) return;
+  const placeholders = ids.map(() => '?').join(',');
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  await exec(`DELETE FROM contacto_clientes WHERE id_contacto IN (${placeholders})`, ids);
 };
 
 const removeByCliente = async (idCliente) => {
@@ -51,5 +63,6 @@ module.exports = {
   insert,
   update,
   remove,
+  removeByIds,
   removeByCliente,
 };

@@ -1,7 +1,10 @@
 const notacreditocompraModel = require('../models/notacreditocompraModel');
 
 const generarCodigoNotaCredito = async (connection) => {
-  const ultimoCodigo = await notacreditocompraModel.getLastCodigo(connection);
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM nota_credito_compra FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const parte1 = 'NCC0001';
 
   if (!ultimoCodigo) {
@@ -9,10 +12,8 @@ const generarCodigoNotaCredito = async (connection) => {
   } else {
     const partes = ultimoCodigo.split('-');
     const parte2 = partes.length > 1 ? partes[1] : '00000000';
-
     const numero = parseInt(parte2, 10);
     const nuevoNumero = isNaN(numero) ? 1 : numero + 1;
-
     return `${parte1}-${nuevoNumero.toString().padStart(8, '0')}`;
   }
 };
@@ -58,39 +59,56 @@ const create = async (data, idPersonal) => {
   const idResponsable = idPersonal || data.id_responsable || null;
 
   const connection = await notacreditocompraModel.getConnection();
+  let codigoNotaCredito;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
 
   try {
     await notacreditocompraModel.beginTransaction(connection);
 
-    const codigoNotaCredito = await generarCodigoNotaCredito(connection);
+    while (intentos < MAX_INTENTOS) {
+      codigoNotaCredito = await generarCodigoNotaCredito(connection);
+      try {
+        await notacreditocompraModel.insertNotaCredito(connection, {
+          codigoNotaCredito,
+          fecha,
+          tipoCmp,
+          codigoletra,
+          ptoVta,
+          NroCmp,
+          moneda,
+          ctz,
+          id_proveedor,
+          id_plancompra,
+          id_motivo,
+          id_servicio,
+          id_movil,
+          id_responsable: idResponsable,
+          id_razonsocial,
+          totalIVA21,
+          totalIVA27,
+          totalIVA10,
+          bonificacion,
+          periodoiva,
+          importe,
+          observacion,
+          estado: 'Completa',
+          saldoFinal,
+          id_factura_compra
+        });
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    await notacreditocompraModel.insertNotaCredito(connection, {
-      codigoNotaCredito,
-      fecha,
-      tipoCmp,
-      codigoletra,
-      ptoVta,
-      NroCmp,
-      moneda,
-      ctz,
-      id_proveedor,
-      id_plancompra,
-      id_motivo,
-      id_servicio,
-      id_movil,
-      id_responsable: idResponsable,
-      id_razonsocial,
-      totalIVA21,
-      totalIVA27,
-      totalIVA10,
-      bonificacion,
-      periodoiva,
-      importe,
-      observacion,
-      estado: 'Completa',
-      saldoFinal,
-      id_factura_compra
-    });
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     const notaCreditoInsertada = await notacreditocompraModel.getNotaCreditoByCodigo(connection, codigoNotaCredito);
     if (notaCreditoInsertada.length === 0) {

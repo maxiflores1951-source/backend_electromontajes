@@ -2,9 +2,10 @@ const db = require('../../db');
 const registrovehicularModel = require('../models/registrovehicularModel');
 
 const generarCodigoRegistroVehicular = async (connection) => {
-  const result = await registrovehicularModel.getLastCodigo(connection);
-  const ultimoCodigo = result.length > 0 ? result[0].ultimo : null;
-
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM registro_vehicular FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const parteFija = 'RM00001';
 
   if (!ultimoCodigo) {
@@ -32,19 +33,36 @@ const create = async (data) => {
   }
 
   const connection = await db.getConnection();
+  let codigo;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
 
   try {
     await connection.beginTransaction();
 
-    const codigo = await generarCodigoRegistroVehicular(connection);
+    while (intentos < MAX_INTENTOS) {
+      codigo = await generarCodigoRegistroVehicular(connection);
+      try {
+        await registrovehicularModel.insertRegistro(connection, [
+          codigo,
+          fecha_entrega,
+          id_motivo,
+          id_servicio || null,
+          observacion || null,
+        ]);
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    await registrovehicularModel.insertRegistro(connection, [
-      codigo,
-      fecha_entrega,
-      id_motivo,
-      id_servicio || null,
-      observacion || null,
-    ]);
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     for (const movil of moviles) {
       try {

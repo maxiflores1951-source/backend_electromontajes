@@ -1,7 +1,10 @@
 const presupuestoModel = require('../models/presupuestoModel');
 
 const generarCodigoPresupuesto = async (connection) => {
-  const ultimoCodigo = await presupuestoModel.getLastCodigo(connection);
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM presupuesto FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const parte1 = 'X00001';
 
   if (!ultimoCodigo) {
@@ -43,33 +46,50 @@ const create = async (data) => {
   }
 
   const connection = await presupuestoModel.getConnection();
+  let codigoPresupuesto;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
 
   try {
     await presupuestoModel.beginTransaction(connection);
 
-    const codigoPresupuesto = await generarCodigoPresupuesto(connection);
+    while (intentos < MAX_INTENTOS) {
+      codigoPresupuesto = await generarCodigoPresupuesto(connection);
+      try {
+        await presupuestoModel.insertPresupuesto(connection, {
+          codigoPresupuesto,
+          fecha,
+          fecha_entrega,
+          condicion_pago,
+          moneda,
+          ctz,
+          id_servicio,
+          id_cliente,
+          id_contacto,
+          id_razonsocial,
+          importe,
+          importe_sin_iva,
+          iva21,
+          observacion,
+          validez_oferta,
+          condiciones_oferta,
+          estado,
+          denominacion,
+          tipo_presupuesto
+        });
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    await presupuestoModel.insertPresupuesto(connection, {
-      codigoPresupuesto,
-      fecha,
-      fecha_entrega,
-      condicion_pago,
-      moneda,
-      ctz,
-      id_servicio,
-      id_cliente,
-      id_contacto,
-      id_razonsocial,
-      importe,
-      importe_sin_iva,
-      iva21,
-      observacion,
-      validez_oferta,
-      condiciones_oferta,
-      estado,
-      denominacion,
-      tipo_presupuesto
-    });
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     if (detalle && detalle.length > 0) {
       const detalleData = detalle.map(({ item, descripcion, cantidad, precio_unitario, importe }) => [

@@ -2,7 +2,10 @@ const otropagosModel = require('../models/otropagosModel');
 const db = require('../../db');
 
 const generarCodigoOtrosPagos = async (connection) => {
-  const ultimoCodigo = await otropagosModel.getLastCodigo(connection);
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM otros_pagos FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const base = 'OTP00001';
 
   if (!ultimoCodigo) {
@@ -36,26 +39,44 @@ const create = async (data, idResponsable) => {
   }
 
   const connection = await db.getConnection();
+  let codigoOtrosPagos;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
+
   try {
     await connection.beginTransaction();
 
-    const codigoOtrosPagos = await generarCodigoOtrosPagos(connection);
+    while (intentos < MAX_INTENTOS) {
+      codigoOtrosPagos = await generarCodigoOtrosPagos(connection);
+      try {
+        await otropagosModel.insertOtrosPagos(connection, [
+          codigoOtrosPagos,
+          fecha,
+          moneda,
+          ctz || 1,
+          id_motivo,
+          id_servicio || null,
+          id_movil || null,
+          idResponsable || null,
+          id_razonsocial,
+          id_plancompra || null,
+          id_proveedor || null,
+          importe,
+          observacion || null,
+        ]);
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    await otropagosModel.insertOtrosPagos(connection, [
-      codigoOtrosPagos,
-      fecha,
-      moneda,
-      ctz || 1,
-      id_motivo,
-      id_servicio || null,
-      id_movil || null,
-      idResponsable || null,
-      id_razonsocial,
-      id_plancompra || null,
-      id_proveedor || null,
-      importe,
-      observacion || null,
-    ]);
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     if (items && items.length > 0) {
       const detalleData = items.map(({ descripcion, importe }) => {

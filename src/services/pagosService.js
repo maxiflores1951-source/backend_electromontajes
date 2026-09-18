@@ -2,7 +2,10 @@ const pagosModel = require('../models/pagosModel');
 const db = require('../../db');
 
 const generarCodigoOrdenPago = async (connection) => {
-  const ultimoCodigo = await pagosModel.getLastCodigo(connection);
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM orden_pago FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const parte1 = 'OP00001';
 
   if (!ultimoCodigo) {
@@ -11,6 +14,40 @@ const generarCodigoOrdenPago = async (connection) => {
 
   const numero = parseInt(ultimoCodigo.split('-')[1], 10) + 1;
   return `${parte1}-${numero.toString().padStart(8, '0')}`;
+};
+
+const validarDatos = async (data) => {
+  const { detalle, otrosimpuestos, formasDePago } = data;
+
+  if (Array.isArray(detalle)) {
+    for (const item of detalle) {
+      const codigo = item.codigo_factura_compra;
+      const esNotaCredito = codigo.startsWith('NCC');
+      const table = esNotaCredito ? 'nota_credito_compra' : 'factura_compra';
+      const [rows] = await db.query(`SELECT 1 FROM ${table} WHERE codigo = ?`, [codigo]);
+      if (rows.length === 0) {
+        throw new Error(`El código ${codigo} no existe en ${table}`);
+      }
+    }
+  }
+
+  if (Array.isArray(otrosimpuestos)) {
+    for (const imp of otrosimpuestos) {
+      const [rows] = await db.query('SELECT 1 FROM otros_impuestos WHERE codigo = ?', [imp.codigo_impuesto]);
+      if (rows.length === 0) {
+        throw new Error(`El impuesto ${imp.codigo_impuesto} no existe`);
+      }
+    }
+  }
+
+  if (Array.isArray(formasDePago)) {
+    for (const fp of formasDePago) {
+      const [rows] = await db.query('SELECT 1 FROM valores WHERE codigo = ?', [fp.codigo_valor]);
+      if (rows.length === 0) {
+        throw new Error(`La forma de pago ${fp.codigo_valor} no existe`);
+      }
+    }
+  }
 };
 
 const create = async (data, idUsuario) => {
@@ -30,22 +67,42 @@ const create = async (data, idUsuario) => {
     throw new Error('Faltan datos obligatorios en la orden de pago');
   }
 
+  await validarDatos(data);
+
   const connection = await db.getConnection();
+  let codigoOrdenPago;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
+
   try {
     await connection.beginTransaction();
 
-    const codigoOrdenPago = await generarCodigoOrdenPago(connection);
+    while (intentos < MAX_INTENTOS) {
+      codigoOrdenPago = await generarCodigoOrdenPago(connection);
+      try {
+        await pagosModel.insertOrdenPago(connection, [
+          codigoOrdenPago,
+          fecha,
+          moneda,
+          ctz || 1,
+          id_proveedor,
+          id_razonsocial,
+          importe,
+          idUsuario || null,
+        ]);
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    await pagosModel.insertOrdenPago(connection, [
-      codigoOrdenPago,
-      fecha,
-      moneda,
-      ctz || 1,
-      id_proveedor,
-      id_razonsocial,
-      importe,
-      idUsuario || null,
-    ]);
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     if (Array.isArray(detalle) && detalle.length > 0) {
       for (const item of detalle) {

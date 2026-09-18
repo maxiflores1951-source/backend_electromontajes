@@ -22,7 +22,10 @@ const extraerCodigoRelacion = (r) =>
     : (r?.codigo ?? r?.codigo_orden ?? r?.codigo_remito ?? r?.orden_compra ?? r?.remito ?? null);
 
 const generarCodigoFactura = async (connection) => {
-  const ultimoCodigo = await facturacompraModel.getLastCodigo(connection);
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM factura_compra FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const parte1 = 'FC00001';
 
   if (!ultimoCodigo) {
@@ -30,10 +33,8 @@ const generarCodigoFactura = async (connection) => {
   } else {
     const partes = ultimoCodigo.split('-');
     const parte2 = partes.length > 1 ? partes[1] : '00000000';
-
     const numero = parseInt(parte2, 10);
     const nuevoNumero = isNaN(numero) ? 1 : numero + 1;
-
     return `${parte1}-${nuevoNumero.toString().padStart(8, '0')}`;
   }
 };
@@ -79,38 +80,55 @@ const create = async (data, idPersonal) => {
   const idCreacion = idPersonal || data.id_creacion || null;
 
   const connection = await facturacompraModel.getConnection();
+  let codigoFactura;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
 
   try {
     await facturacompraModel.beginTransaction(connection);
 
-    const codigoFactura = await generarCodigoFactura(connection);
+    while (intentos < MAX_INTENTOS) {
+      codigoFactura = await generarCodigoFactura(connection);
+      try {
+        await facturacompraModel.insertFactura(connection, {
+          codigoFactura,
+          fecha: toMysqlFecha(fecha),
+          tipoCmp,
+          codigoletra,
+          ptoVta,
+          NroCmp,
+          moneda,
+          ctz,
+          id_proveedor,
+          id_plancompra,
+          id_motivo,
+          id_servicio,
+          id_movil,
+          id_responsable: idResponsable,
+          id_razonsocial,
+          totalIVA21,
+          totalIVA27,
+          totalIVA10,
+          bonificacion,
+          periodoiva,
+          importe,
+          observacion,
+          estado,
+          saldoFinal
+        });
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    await facturacompraModel.insertFactura(connection, {
-      codigoFactura,
-      fecha: toMysqlFecha(fecha),
-      tipoCmp,
-      codigoletra,
-      ptoVta,
-      NroCmp,
-      moneda,
-      ctz,
-      id_proveedor,
-      id_plancompra,
-      id_motivo,
-      id_servicio,
-      id_movil,
-      id_responsable: idResponsable,
-      id_razonsocial,
-      totalIVA21,
-      totalIVA27,
-      totalIVA10,
-      bonificacion,
-      periodoiva,
-      importe,
-      observacion,
-      estado,
-      saldoFinal
-    });
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     if (item && item.length > 0) {
       const movimientosData = item.map(({

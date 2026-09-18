@@ -4,6 +4,7 @@ const clientesController = require('../controllers/clientesController');
 
 router.get('/', clientesController.getAll);
 router.post('/agregar', clientesController.create);
+router.put('/:id', clientesController.update);
 router.get('/clientes/:id/ventas', clientesController.getVentas);
 router.get('/clientes/:id', clientesController.getById);
 router.get('/estados-obra', clientesController.getEstadosObra);

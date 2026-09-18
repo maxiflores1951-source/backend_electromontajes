@@ -2,7 +2,10 @@ const ordencompraModel = require('../models/ordencompraModel');
 const conceptoModel = require('../models/conceptoModel');
 
 const generarCodigoMovimiento = async (connection) => {
-  const ultimoCodigo = await ordencompraModel.getLastCodigo(connection);
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM orden_compra FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const parte1 = 'OC00001';
 
   if (!ultimoCodigo) {
@@ -10,10 +13,8 @@ const generarCodigoMovimiento = async (connection) => {
   } else {
     const partes = ultimoCodigo.split('-');
     const parte2 = partes.length > 1 ? partes[1] : '00000000';
-
     const numero = parseInt(parte2, 10);
     const nuevoNumero = isNaN(numero) ? 1 : numero + 1;
-
     return `${parte1}-${nuevoNumero.toString().padStart(8, '0')}`;
   }
 };
@@ -40,28 +41,44 @@ const create = async (data = {}) => {
   } = data;
 
   const connection = await ordencompraModel.getConnection();
+  let codigoOrden;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
 
   try {
     await ordencompraModel.beginTransaction(connection);
 
-    const codigoOrden = await generarCodigoMovimiento(connection);
+    while (intentos < MAX_INTENTOS) {
+      codigoOrden = await generarCodigoMovimiento(connection);
+      try {
+        await ordencompraModel.insertOrden(connection, {
+          codigoOrden,
+          fecha_pedido,
+          fecha_entrega: fecha_entrega || fecha_pedido,
+          id_solicitado,
+          id_entregado: id_entregado || id_solicitado,
+          id_proveedor,
+          id_motivo,
+          id_servicio,
+          id_movil,
+          activo,
+          id_razon_social,
+          observacion,
+          id_creado
+        });
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    await ordencompraModel.insertOrden(connection, {
-      codigoOrden,
-      fecha_pedido,
-      fecha_entrega: fecha_entrega || fecha_pedido,
-      id_solicitado,
-      id_entregado: id_entregado || id_solicitado,
-
-      id_proveedor,
-      id_motivo,
-      id_servicio,
-      id_movil,
-      activo,
-      id_razon_social,
-      observacion,
-      id_creado
-    });
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     const movimientosData = (item || []).map(({ id_articulo, id_concepto, tipo_movimiento, nombre, unidad, cantidad, codigo_tipo_epp, codigo_epp }) => [
       codigoOrden,

@@ -2,7 +2,10 @@ const db = require('../../db');
 const checklistModel = require('../models/checklistModel');
 
 const generarCodigo = async (connection) => {
-  const ultimoCodigo = await checklistModel.getLastCodigo(connection);
+  const [rows] = await connection.query(
+    'SELECT MAX(codigo) AS ultimo FROM checklist FOR UPDATE'
+  );
+  const ultimoCodigo = rows[0]?.ultimo;
   const parte1 = 'CHK00001';
 
   if (!ultimoCodigo) {
@@ -11,9 +14,8 @@ const generarCodigo = async (connection) => {
 
   const partes = ultimoCodigo.split('-');
   const parte2 = partes.length > 1 ? partes[1] : '00000000';
-  const numero = parseInt(parte2, 10);
-  const nuevoNumero = isNaN(numero) ? 1 : numero + 1;
-  return `${parte1}-${nuevoNumero.toString().padStart(8, '0')}`;
+  const numero = parseInt(partes[1] || '0', 10) + 1;
+  return `${parte1}-${numero.toString().padStart(8, '0')}`;
 };
 
 const getItemsConSecciones = async () => {
@@ -35,20 +37,37 @@ const create = async (data, idPersonal) => {
   }
 
   const connection = await db.getConnection();
+  let nuevoCodigo;
+  let intentos = 0;
+  const MAX_INTENTOS = 5;
 
   try {
     await connection.beginTransaction();
 
-    const nuevoCodigo = await generarCodigo(connection);
+    while (intentos < MAX_INTENTOS) {
+      nuevoCodigo = await generarCodigo(connection);
+      try {
+        await checklistModel.insertCabecera(connection, {
+          codigo: nuevoCodigo,
+          id_movil,
+          fecha,
+          id_responsable: idPersonal || data.id_responsable,
+          kilometraje_actual,
+          observaciones_mecanicas: observacion || '',
+        });
+        break;
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          intentos++;
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    await checklistModel.insertCabecera(connection, {
-      codigo: nuevoCodigo,
-      id_movil,
-      fecha,
-      id_responsable: idPersonal || data.id_responsable,
-      kilometraje_actual,
-      observaciones_mecanicas: observacion || '',
-    });
+    if (intentos >= MAX_INTENTOS) {
+      throw new Error('No se pudo generar un código único después de varios intentos');
+    }
 
     if (Array.isArray(respuestas) && respuestas.length > 0) {
       const respuestasData = respuestas.map(({ codigo_item, valor }) => [

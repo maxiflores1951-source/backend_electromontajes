@@ -26,14 +26,51 @@ const getAll = async () => {
   return rows;
 };
 
-const insert = async (data) => {
+const insert = async (data, connection) => {
   const { DENOMINACION, DIRECCION, IDSITFISCAL, CUIT, EMAIL, TELEFONO } = data;
   const query = `
     INSERT INTO clientes (DENOMINACION, DIRECCION, IDSITFISCAL, CUIT, EMAIL, TELEFONO)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
-  const [result] = await db.query(query, [DENOMINACION, DIRECCION, IDSITFISCAL, CUIT, EMAIL, TELEFONO]);
+  const values = [DENOMINACION, DIRECCION, IDSITFISCAL, CUIT, EMAIL, TELEFONO];
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  const [result] = await exec(query, values);
   return result.insertId;
+};
+
+const updateById = async (id, data, connection) => {
+  const { DENOMINACION, DIRECCION, IDSITFISCAL, CUIT, EMAIL, TELEFONO, id_modificado } = data;
+  const query = `
+    UPDATE clientes
+    SET
+      DENOMINACION = ?,
+      DIRECCION = ?,
+      IDSITFISCAL = ?,
+      CUIT = ?,
+      EMAIL = ?,
+      TELEFONO = ?,
+      id_modificado = ?
+    WHERE CODCLI = ?
+  `;
+  const values = [
+    DENOMINACION,
+    DIRECCION,
+    IDSITFISCAL,
+    CUIT,
+    EMAIL,
+    TELEFONO,
+    id_modificado || null,
+    id,
+  ];
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  const [result] = await exec(query, values);
+  return result.affectedRows;
+};
+
+const existsById = async (id, connection) => {
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  const [rows] = await exec('SELECT 1 FROM clientes WHERE CODCLI = ? LIMIT 1', [id]);
+  return rows.length > 0;
 };
 
 const getClienteById = async (connection, id) => {
@@ -166,6 +203,8 @@ const getEstadosObra = async () => {
 module.exports = {
   getAll,
   insert,
+  updateById,
+  existsById,
   getClienteById,
   getServiciosCliente,
   getPresupuestosCliente,
