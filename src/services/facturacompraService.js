@@ -76,8 +76,8 @@ const create = async (data, idPersonal) => {
   }
 
   const saldoFinal = typeof saldo === 'number' && !isNaN(saldo) ? saldo : 0;
-  const idResponsable = idPersonal || data.id_responsable || null;
-  const idCreacion = idPersonal || data.id_creacion || null;
+  const idResponsable = data.id_responsable || null;
+  const idCreacion = data.id_creacion || idPersonal || null;
 
   const connection = await facturacompraModel.getConnection();
   let codigoFactura;

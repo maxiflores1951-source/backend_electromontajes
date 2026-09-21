@@ -180,10 +180,59 @@ const getConFacturas = async () => {
   return presupuestosCompletos;
 };
 
+const getByCodigo = async (codigo) => {
+  const presupuesto = await presupuestoModel.getPresupuestoByCodigo(codigo);
+
+  if (!presupuesto) {
+    const error = new Error('Presupuesto no encontrado');
+    error.status = 404;
+    throw error;
+  }
+
+  const detalle = await presupuestoModel.getDetallePresupuesto(codigo);
+
+  return {
+    ...presupuesto,
+    detalle
+  };
+};
+
+const update = async (codigo, data) => {
+  const { detalle, ...presupuestoData } = data;
+
+  const connection = await presupuestoModel.getConnection();
+
+  try {
+    await presupuestoModel.beginTransaction(connection);
+
+    await presupuestoModel.updatePresupuesto(connection, codigo, presupuestoData);
+
+    if (detalle && detalle.length > 0) {
+      await presupuestoModel.deleteDetalle(connection, codigo);
+
+      const detalleData = detalle.map(({ item, descripcion, cantidad, precio_unitario, importe }) => [
+        codigo, item, descripcion, cantidad, precio_unitario, importe
+      ]);
+
+      await presupuestoModel.insertDetalle(connection, detalleData);
+    }
+
+    await presupuestoModel.commit(connection);
+    return codigo;
+  } catch (error) {
+    await presupuestoModel.rollback(connection);
+    throw error;
+  } finally {
+    await presupuestoModel.release(connection);
+  }
+};
+
 module.exports = {
   create,
   getAll,
   getFacturar,
   getActivos,
   getConFacturas,
+  getByCodigo,
+  update,
 };

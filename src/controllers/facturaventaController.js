@@ -108,6 +108,20 @@ const getCalendario = async (req, res) => {
   }
 };
 
+const getSaldosPorCliente = async (req, res) => {
+  try {
+    const idRazonSocial = req.query.id_razon_social || req.params.id;
+    if (!idRazonSocial) {
+      return res.status(400).json({ error: 'Falta el parámetro id_razon_social' });
+    }
+    const saldos = await facturaventaService.getSaldosPorCliente(idRazonSocial);
+    res.json(saldos);
+  } catch (error) {
+    console.error('Error al obtener saldos por cliente:', error);
+    res.status(500).json({ error: 'Error al obtener saldos por cliente', details: error.message });
+  }
+};
+
 module.exports = {
   create,
   getAll,
@@ -117,4 +131,5 @@ module.exports = {
   getByCliente,
   getPorClienteRazonSocial,
   getCalendario,
+  getSaldosPorCliente,
 };

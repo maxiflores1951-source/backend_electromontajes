@@ -216,6 +216,82 @@ const getFacturasPresupuesto = async (codigo) => {
   return rows;
 };
 
+const getPresupuestoByCodigo = async (codigo) => {
+  const [rows] = await db.query(`
+    SELECT p.*,
+           c.DENOMINACION AS nombre_cliente,
+           c.CUIT AS cuit_cliente,
+           c.IDSITFISCAL AS situacion_fiscal_cliente,
+           rs.razon_social AS razon_social_empresa,
+           rs.cuil AS cuit_razon_social,
+           mon.nombre AS nombre_moneda,
+           s.OBRA AS nombre_servicio,
+           cc.nombre AS nombre_contacto
+    FROM presupuesto p
+    JOIN clientes c ON p.id_cliente = c.CODCLI
+    JOIN razones_sociales rs ON p.id_razonsocial = rs.id
+    JOIN moneda mon ON p.moneda = mon.codigo
+    LEFT JOIN servicios s ON p.id_servicio = s.IDOBRA
+    LEFT JOIN contacto_clientes cc ON p.id_contacto = cc.id_contacto
+    WHERE p.codigo = ?
+  `, [codigo]);
+  return rows[0];
+};
+
+const updatePresupuesto = async (connection, codigo, data) => {
+  const {
+    fecha, fecha_entrega, condicion_pago,
+    moneda, ctz, id_servicio,
+    observacion, importe, importe_sin_iva, iva21,
+    estado, denominacion, id_cliente, id_razonsocial,
+    id_contacto, tipo_presupuesto, validez_oferta,
+    condiciones_oferta
+  } = data;
+
+  const query = `
+    UPDATE presupuesto SET
+      fecha = COALESCE(?, fecha),
+      fecha_entrega = COALESCE(?, fecha_entrega),
+      condicion_pago = COALESCE(?, condicion_pago),
+      moneda = COALESCE(?, moneda),
+      ctz = COALESCE(?, ctz),
+      id_servicio = COALESCE(?, id_servicio),
+      id_cliente = COALESCE(?, id_cliente),
+      id_razonsocial = COALESCE(?, id_razonsocial),
+      id_contacto = COALESCE(?, id_contacto),
+      importe = COALESCE(?, importe),
+      importe_sin_iva = COALESCE(?, importe_sin_iva),
+      iva21 = COALESCE(?, iva21),
+      saldo = COALESCE(?, saldo),
+      saldo_iva = COALESCE(?, saldo_iva),
+      saldo_sin_iva = COALESCE(?, saldo_sin_iva),
+      observacion = COALESCE(?, observacion),
+      validez_oferta = COALESCE(?, validez_oferta),
+      condiciones_oferta = COALESCE(?, condiciones_oferta),
+      estado = COALESCE(?, estado),
+      denominacion = COALESCE(?, denominacion),
+      tipo_presupuesto = COALESCE(?, tipo_presupuesto)
+    WHERE codigo = ?
+  `;
+
+  await connection.query(query, [
+    fecha, fecha_entrega, condicion_pago,
+    moneda, ctz, id_servicio,
+    id_cliente, id_razonsocial, id_contacto,
+    importe, importe_sin_iva, iva21,
+    importe, importe, importe_sin_iva,
+    observacion, validez_oferta, condiciones_oferta,
+    estado, denominacion,
+    tipo_presupuesto ? 1 : 0,
+    codigo
+  ]);
+};
+
+const deleteDetalle = async (connection, codigo) => {
+  const query = `DELETE FROM detalle_presupuesto WHERE codigo_presupuesto = ?`;
+  await connection.query(query, [codigo]);
+};
+
 module.exports = {
   getConnection,
   beginTransaction,
@@ -231,4 +307,7 @@ module.exports = {
   getPresupuestosActivos,
   getPresupuestosConFacturas,
   getFacturasPresupuesto,
+  getPresupuestoByCodigo,
+  updatePresupuesto,
+  deleteDetalle,
 };

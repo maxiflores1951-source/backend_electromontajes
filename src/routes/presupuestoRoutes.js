@@ -7,5 +7,7 @@ router.get('/', presupuestoController.getAll);
 router.get('/facturar', presupuestoController.getFacturar);
 router.get('/presupuestos-activos', presupuestoController.getActivos);
 router.get('/con-facturas', presupuestoController.getConFacturas);
+router.get('/:codigo', presupuestoController.getByCodigo);
+router.put('/:codigo', presupuestoController.update);
 
 module.exports = router;

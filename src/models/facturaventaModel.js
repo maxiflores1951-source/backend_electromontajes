@@ -446,6 +446,26 @@ const getCalendario = async () => {
   return rows;
 };
 
+const getSaldosPorCliente = async (idRazonSocial) => {
+  const query = `
+    SELECT 
+      c.CODCLI AS id_cliente,
+      c.DENOMINACION AS nombre_cliente,
+      rs.razon_social AS razon_social_cliente,
+      c.CUIT AS cuit_cliente,
+      SUM(fv.saldo) AS monto_total
+    FROM factura_venta fv
+    JOIN clientes c ON fv.id_cliente = c.CODCLI
+    JOIN razones_sociales rs ON fv.id_razonsocial = rs.id
+    WHERE fv.id_razonsocial = ?
+      AND fv.saldo <> 0
+    GROUP BY c.CODCLI, c.DENOMINACION, rs.razon_social, c.CUIT
+    ORDER BY monto_total DESC
+  `;
+  const [rows] = await db.query(query, [idRazonSocial]);
+  return rows;
+};
+
 module.exports = {
   getUltimoCodigo,
   insert,
@@ -473,4 +493,5 @@ module.exports = {
   getOtrosImpuestosNotaCredito,
   getFormasPagoNotaCredito,
   getCalendario,
+  getSaldosPorCliente,
 };

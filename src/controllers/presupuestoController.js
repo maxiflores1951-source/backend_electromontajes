@@ -70,10 +70,46 @@ const getConFacturas = async (req, res) => {
   }
 };
 
+const getByCodigo = async (req, res) => {
+  try {
+    const { codigo } = req.params;
+    const presupuesto = await presupuestoService.getByCodigo(codigo);
+    res.json(presupuesto);
+  } catch (error) {
+    if (error.status === 404) {
+      return res.status(404).json({ error: error.message });
+    }
+    console.error('Error al obtener presupuesto:', error);
+    res.status(500).json({
+      error: 'Error al obtener presupuesto',
+      details: error.message
+    });
+  }
+};
+
+const update = async (req, res) => {
+  try {
+    const { codigo } = req.params;
+    await presupuestoService.update(codigo, req.body);
+    res.json({
+      mensaje: 'Presupuesto actualizado correctamente',
+      codigo: codigo
+    });
+  } catch (error) {
+    console.error('Error al actualizar presupuesto:', error);
+    res.status(500).json({
+      error: 'Error al actualizar presupuesto',
+      details: error.message
+    });
+  }
+};
+
 module.exports = {
   create,
   getAll,
   getFacturar,
   getActivos,
   getConFacturas,
+  getByCodigo,
+  update,
 };

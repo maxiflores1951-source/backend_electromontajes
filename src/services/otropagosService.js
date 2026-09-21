@@ -201,7 +201,7 @@ const update = async (codigo, data, idResponsable) => {
     }
 
     if (formasDePago && formasDePago.length > 0) {
-      const formasPagoData = formasDePago.map(({ codigo: codigo_valor, fecha, importe }) => {
+      const formasPagoData = formasDePago.map(({ codigo_valor, fecha, importe }) => {
         if (!codigo_valor || !fecha || importe === undefined) {
           throw new Error(`Datos incompletos en forma de pago: ${JSON.stringify({ codigo_valor, fecha, importe })}`);
         }

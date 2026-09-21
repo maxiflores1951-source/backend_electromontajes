@@ -10,5 +10,6 @@ router.get('/filtrar', facturaventaController.filtrar);
 router.get('/por-cliente/:id', facturaventaController.getByCliente);
 router.get('/por-cliente-razonsocial/:idCliente/:idRazonSocial', facturaventaController.getPorClienteRazonSocial);
 router.get('/calendario', facturaventaController.getCalendario);
+router.get('/saldos-cliente', facturaventaController.getSaldosPorCliente);
 
 module.exports = router;

@@ -348,6 +348,10 @@ const getCalendario = async () => {
   return facturasCompletas;
 };
 
+const getSaldosPorCliente = async (idRazonSocial) => {
+  return await facturaventaModel.getSaldosPorCliente(idRazonSocial);
+};
+
 module.exports = {
   create,
   getAll,
@@ -357,4 +361,5 @@ module.exports = {
   getByCliente,
   getPorClienteRazonSocial,
   getCalendario,
+  getSaldosPorCliente,
 };

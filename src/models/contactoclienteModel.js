@@ -6,7 +6,7 @@ const getAll = async () => {
 };
 
 const getByCliente = async (idCliente, connection) => {
-  const exec = connection ? connection.query.bind(connection) : db.query;
+  const exec = connection ? connection.query.bind(connection) : db.query.bind(db);
   const [rows] = await exec('SELECT * FROM contacto_clientes WHERE id_cliente = ?', [idCliente]);
   return rows;
 };
