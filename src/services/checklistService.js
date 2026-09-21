@@ -3,7 +3,7 @@ const checklistModel = require('../models/checklistModel');
 
 const generarCodigo = async (connection) => {
   const [rows] = await connection.query(
-    'SELECT MAX(codigo) AS ultimo FROM checklist FOR UPDATE'
+    'SELECT MAX(codigo) AS ultimo FROM checklist_unidad_movil FOR UPDATE'
   );
   const ultimoCodigo = rows[0]?.ultimo;
   const parte1 = 'CHK00001';
