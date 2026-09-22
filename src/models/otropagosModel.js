@@ -11,8 +11,8 @@ const insertOtrosPagos = async (connection, values) => {
       codigo, fecha, moneda, ctz,
       id_motivo, id_servicio, id_movil, id_responsable,
       id_razonsocial, id_plancompra, id_proveedor,
-      importe, observacion, fecha_creacion, anulada
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 0)
+      importe, observacion, fecha_creacion, anulada, id_creado
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 0, ?)
   `;
   await connection.query(query, values);
 };
@@ -48,7 +48,11 @@ const getAll = async (connection) => {
       r.cuil AS cuil_razon_social,
       pc.descripcion AS nombre_plan,
       p.NOMBRE AS nombre_responsable,
-      p.DNI AS dni_responsable
+      p.DNI AS dni_responsable,
+      op.id_creado,
+      pc2.NOMBRE AS nombre_creado,
+      op.id_modificado,
+      pc3.NOMBRE AS nombre_modificado
     FROM 
       otros_pagos op
       LEFT JOIN moneda m ON op.moneda = m.codigo
@@ -58,6 +62,8 @@ const getAll = async (connection) => {
       LEFT JOIN razones_sociales r ON op.id_razonsocial = r.id
       LEFT JOIN plandecompra pc ON op.id_plancompra = pc.codigo
       LEFT JOIN personal p ON op.id_responsable = p.ID
+      LEFT JOIN personal pc2 ON pc2.ID = op.id_creado
+      LEFT JOIN personal pc3 ON pc3.ID = op.id_modificado
     ORDER BY 
       op.codigo DESC;
   `;
@@ -78,7 +84,11 @@ const getByCodigo = async (connection, codigo) => {
       r.cuil AS cuil_razon_social,
       pc.descripcion AS nombre_plan,
       p.NOMBRE AS nombre_responsable,
-      p.DNI AS dni_responsable
+      p.DNI AS dni_responsable,
+      op.id_creado,
+      pc2.NOMBRE AS nombre_creado,
+      op.id_modificado,
+      pc3.NOMBRE AS nombre_modificado
     FROM otros_pagos op
       LEFT JOIN moneda m ON op.moneda = m.codigo
       LEFT JOIN motivos mo ON op.id_motivo = mo.codigo
@@ -87,6 +97,8 @@ const getByCodigo = async (connection, codigo) => {
       LEFT JOIN razones_sociales r ON op.id_razonsocial = r.id
       LEFT JOIN plandecompra pc ON op.id_plancompra = pc.codigo
       LEFT JOIN personal p ON op.id_responsable = p.ID
+      LEFT JOIN personal pc2 ON pc2.ID = op.id_creado
+      LEFT JOIN personal pc3 ON pc3.ID = op.id_modificado
     WHERE op.codigo = ?
     LIMIT 1
   `;
@@ -121,7 +133,7 @@ const updateOtrosPagos = async (connection, values) => {
       fecha = ?, moneda = ?, ctz = ?,
       id_motivo = ?, id_servicio = ?, id_movil = ?, id_responsable = ?,
       id_razonsocial = ?, id_plancompra = ?, id_proveedor = ?,
-      importe = ?, observacion = ?
+      importe = ?, observacion = ?, id_modificado = ?, fecha_modificacion = NOW()
     WHERE codigo = ?
   `;
   await connection.query(query, values);

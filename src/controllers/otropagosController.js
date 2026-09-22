@@ -2,8 +2,7 @@ const otropagosService = require('../services/otropagosService');
 
 const create = async (req, res) => {
   try {
-    const idResponsable = req.body.id_responsable;
-    const codigo = await otropagosService.create(req.body, idResponsable);
+    const codigo = await otropagosService.create(req.body, req.idPersonal);
     res.status(201).json({
       mensaje: 'Otros pagos registrados correctamente',
       codigo,
@@ -45,8 +44,7 @@ const getByCodigo = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const idResponsable = req.body.id_responsable;
-    const codigo = await otropagosService.update(req.params.codigo, req.body, idResponsable);
+    const codigo = await otropagosService.update(req.params.codigo, req.body, req.idPersonal);
     res.status(200).json({
       mensaje: 'Otros pagos actualizados correctamente',
       codigo,

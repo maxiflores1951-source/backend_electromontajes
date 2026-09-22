@@ -17,7 +17,7 @@ const generarCodigoOtrosPagos = async (connection) => {
   }
 };
 
-const create = async (data, idResponsable) => {
+const create = async (data, idCreador) => {
   const {
     fecha,
     moneda,
@@ -25,6 +25,7 @@ const create = async (data, idResponsable) => {
     id_motivo,
     id_servicio,
     id_movil,
+    id_responsable,
     id_razonsocial,
     id_plancompra,
     id_proveedor,
@@ -57,12 +58,13 @@ const create = async (data, idResponsable) => {
           id_motivo,
           id_servicio || null,
           id_movil || null,
-          idResponsable || null,
+          id_responsable || null,
           id_razonsocial,
           id_plancompra || null,
           id_proveedor || null,
           importe,
           observacion || null,
+          idCreador || null,
         ]);
         break;
       } catch (err) {
@@ -145,7 +147,7 @@ const getByCodigo = async (codigo) => {
   }
 };
 
-const update = async (codigo, data, idResponsable) => {
+const update = async (codigo, data, idModificador) => {
   const {
     fecha,
     moneda,
@@ -153,6 +155,7 @@ const update = async (codigo, data, idResponsable) => {
     id_motivo,
     id_servicio,
     id_movil,
+    id_responsable,
     id_razonsocial,
     id_plancompra,
     id_proveedor,
@@ -177,12 +180,13 @@ const update = async (codigo, data, idResponsable) => {
       id_motivo,
       id_servicio || null,
       id_movil || null,
-      idResponsable || null,
+      id_responsable || null,
       id_razonsocial,
       id_plancompra || null,
       id_proveedor || null,
       importe,
       observacion || null,
+      idModificador || null,
       codigo,
     ]);
 
