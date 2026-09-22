@@ -4,7 +4,8 @@ const getAll = async () => {
   const query = `
     SELECT m.nro_ident, m.patente, m.id_responsable, m.kilometraje, m.tipo, t.descripcion AS tipo_descripcion, m.activo,
            m.id_propietario, p.nombre AS propietario_nombre,
-           m.id_medida_bateria, mb.codigo_amperaje AS medida_bateria_nombre
+           m.id_medida_bateria, mb.codigo_amperaje AS medida_bateria_nombre,
+           m.tamano_rodado, m.tipo_combustible
     FROM moviles m
     LEFT JOIN tipo_unidad_movil t ON m.tipo = t.codigo
     LEFT JOIN propietarios p ON m.id_propietario = p.id
@@ -18,7 +19,8 @@ const getByNroIdent = async (nro_ident) => {
   const [rows] = await db.execute(
     `SELECT m.nro_ident, m.patente, m.id_responsable, m.kilometraje, m.tipo, t.descripcion AS tipo_descripcion, m.activo,
             m.id_propietario, p.nombre AS propietario_nombre,
-            m.id_medida_bateria, mb.codigo_amperaje AS medida_bateria_nombre
+            m.id_medida_bateria, mb.codigo_amperaje AS medida_bateria_nombre,
+            m.tamano_rodado, m.tipo_combustible
      FROM moviles m
      LEFT JOIN tipo_unidad_movil t ON m.tipo = t.codigo
      LEFT JOIN propietarios p ON m.id_propietario = p.id
@@ -37,16 +39,16 @@ const insert = async (data) => {
     nro_ident = `UM${numero.toString().padStart(2, '0')}`;
   }
   const [result] = await db.execute(
-    'INSERT INTO moviles (nro_ident, patente, id_responsable, kilometraje, tipo, activo, id_creado, id_propietario, id_medida_bateria) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [nro_ident, data.patente ?? null, data.id_responsable ?? null, data.kilometraje ?? null, data.tipo ?? null, data.activo == null ? 1 : data.activo ? 1 : 0, data.id_creado ?? null, data.id_propietario ?? null, data.id_medida_bateria ?? null]
+    'INSERT INTO moviles (nro_ident, patente, id_responsable, kilometraje, tipo, activo, id_creado, id_propietario, id_medida_bateria, tamano_rodado, tipo_combustible) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [nro_ident, data.patente ?? null, data.id_responsable ?? null, data.kilometraje ?? null, data.tipo ?? null, data.activo == null ? 1 : data.activo ? 1 : 0, data.id_creado ?? null, data.id_propietario ?? null, data.id_medida_bateria ?? null, data.tamano_rodado ?? null, data.tipo_combustible ?? null]
   );
   return nro_ident;
 };
 
 const update = async (nro_ident, data) => {
   const [result] = await db.execute(
-    'UPDATE moviles SET nro_ident = ?, patente = ?, id_responsable = ?, kilometraje = ?, tipo = ?, activo = ?, id_modificado = ?, id_propietario = ?, id_medida_bateria = ? WHERE nro_ident = ?',
-    [data.nro_ident ?? nro_ident, data.patente ?? null, data.id_responsable ?? null, data.kilometraje ?? null, data.tipo ?? null, data.activo == null ? 1 : data.activo ? 1 : 0, data.id_modificado ?? null, data.id_propietario ?? null, data.id_medida_bateria ?? null, nro_ident]
+    'UPDATE moviles SET nro_ident = ?, patente = ?, id_responsable = ?, kilometraje = ?, tipo = ?, activo = ?, id_modificado = ?, id_propietario = ?, id_medida_bateria = ?, tamano_rodado = ?, tipo_combustible = ? WHERE nro_ident = ?',
+    [data.nro_ident ?? nro_ident, data.patente ?? null, data.id_responsable ?? null, data.kilometraje ?? null, data.tipo ?? null, data.activo == null ? 1 : data.activo ? 1 : 0, data.id_modificado ?? null, data.id_propietario ?? null, data.id_medida_bateria ?? null, data.tamano_rodado ?? null, data.tipo_combustible ?? null, nro_ident]
   );
   return result.affectedRows;
 };

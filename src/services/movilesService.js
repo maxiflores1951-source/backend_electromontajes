@@ -23,6 +23,8 @@ const create = async (data) => {
     id_creado: data.id_creado ?? null,
     id_propietario: data.id_propietario ?? null,
     id_medida_bateria: data.id_medida_bateria ?? null,
+    tamano_rodado: data.tamano_rodado ?? null,
+    tipo_combustible: data.tipo_combustible ?? null,
   };
 
   const nroIdentGenerado = await movilesModel.insert(sanitizedData);
@@ -41,6 +43,8 @@ const update = async (nro_ident, data) => {
     id_modificado: data.id_modificado ?? null,
     id_propietario: data.id_propietario ?? null,
     id_medida_bateria: data.id_medida_bateria ?? null,
+    tamano_rodado: data.tamano_rodado ?? null,
+    tipo_combustible: data.tipo_combustible ?? null,
   };
   const affected = await movilesModel.update(nro_ident, sanitizedData);
   if (affected === 0) throw new Error('Móvil no encontrado');
