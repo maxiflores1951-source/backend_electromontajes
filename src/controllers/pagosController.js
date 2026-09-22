@@ -53,8 +53,32 @@ const getByProveedor = async (req, res) => {
   }
 };
 
+const update = async (req, res) => {
+  const { codigo } = req.params;
+  try {
+    const codigoActualizado = await pagosService.update(codigo, req.body, req.idPersonal);
+    res.status(200).json({
+      mensaje: 'Orden de pago actualizada correctamente',
+      codigo: codigoActualizado,
+    });
+  } catch (err) {
+    if (err.message.includes('Faltan datos obligatorios')) {
+      return res.status(400).json({ error: err.message });
+    }
+    if (err.message.includes('La orden de pago no existe')) {
+      return res.status(404).json({ error: err.message });
+    }
+    console.error(err);
+    res.status(500).json({
+      error: 'Error al actualizar orden de pago',
+      detalle: err.message,
+    });
+  }
+};
+
 module.exports = {
   create,
   getAll,
   getByProveedor,
+  update,
 };

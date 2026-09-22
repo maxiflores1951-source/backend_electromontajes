@@ -66,6 +66,62 @@ const insertFormasPago = async (connection, data) => {
   await connection.query(query, [data]);
 };
 
+const getDetalleOrdenPago = async (connection, codigoOrdenPago) => {
+  const query = `
+    SELECT
+      codigo_factura_compra,
+      codigo_notacredito_compra,
+      importe
+    FROM detalle_orden_pago
+    WHERE codigo_orden_pago = ?
+  `;
+  const [rows] = await connection.query(query, [codigoOrdenPago]);
+  return rows;
+};
+
+const restoreSaldoFactura = async (connection, importeNum, codigo) => {
+  const query = `
+    UPDATE factura_compra
+    SET saldo = saldo + ?,
+        pagada = IF(saldo + ? > 0, 0, 1)
+    WHERE codigo = ?
+  `;
+  await connection.query(query, [importeNum, importeNum, codigo]);
+};
+
+const restoreSaldoNotaCredito = async (connection, importeNum, codigo) => {
+  const query = `
+    UPDATE nota_credito_compra
+    SET saldo = saldo + ?,
+        pagada = IF(saldo + ? > 0, 0, 1)
+    WHERE codigo = ?
+  `;
+  await connection.query(query, [importeNum, importeNum, codigo]);
+};
+
+const borrarDetalleOrdenPago = async (connection, codigoOrdenPago) => {
+  await connection.query('DELETE FROM detalle_orden_pago WHERE codigo_orden_pago = ?', [codigoOrdenPago]);
+};
+
+const borrarOtrosImpuestosOrdenPago = async (connection, codigoOrdenPago) => {
+  await connection.query('DELETE FROM otros_impuestos_orden_pago WHERE codigo_orden_pago = ?', [codigoOrdenPago]);
+};
+
+const borrarFormasPagoOrdenPago = async (connection, codigoOrdenPago) => {
+  await connection.query('DELETE FROM formas_pago_orden_pago WHERE codigo_orden_pago = ?', [codigoOrdenPago]);
+};
+
+const updateOrdenPago = async (connection, codigo, values) => {
+  const query = `
+    UPDATE orden_pago
+    SET fecha = ?, moneda = ?, ctz = ?,
+        id_proveedor = ?, id_razonsocial = ?, importe = ?,
+        id_modificado = ?, fecha_modificacion = CURRENT_TIMESTAMP()
+    WHERE codigo = ?
+  `;
+  await connection.query(query, [...values, codigo]);
+};
+
 const getOrdenesPago = async (connection) => {
   const query = `
     SELECT 
@@ -267,6 +323,13 @@ module.exports = {
   updateSaldoFactura,
   insertOtrosImpuestos,
   insertFormasPago,
+  getDetalleOrdenPago,
+  restoreSaldoFactura,
+  restoreSaldoNotaCredito,
+  borrarDetalleOrdenPago,
+  borrarOtrosImpuestosOrdenPago,
+  borrarFormasPagoOrdenPago,
+  updateOrdenPago,
   getOrdenesPago,
   getFacturasByOrdenPago,
   getNotasCreditoByOrdenPago,

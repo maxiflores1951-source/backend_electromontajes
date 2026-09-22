@@ -20,8 +20,16 @@ const validarDatos = async (data) => {
   const { detalle, otrosimpuestos, formasDePago } = data;
 
   if (Array.isArray(detalle)) {
+    const codigosVistos = new Set();
     for (const item of detalle) {
       const codigo = item.codigo_factura_compra;
+      if (!codigo) {
+        throw new Error('El detalle debe incluir codigo_factura_compra');
+      }
+      if (codigosVistos.has(codigo)) {
+        throw new Error(`La factura ${codigo} está duplicada en el detalle`);
+      }
+      codigosVistos.add(codigo);
       const esNotaCredito = codigo.startsWith('NCC');
       const table = esNotaCredito ? 'nota_credito_compra' : 'factura_compra';
       const [rows] = await db.query(`SELECT 1 FROM ${table} WHERE codigo = ?`, [codigo]);
@@ -154,6 +162,115 @@ const create = async (data, idUsuario) => {
   }
 };
 
+const update = async (codigo, data, idUsuario) => {
+  const {
+    fecha,
+    moneda,
+    ctz,
+    id_proveedor,
+    id_razonsocial,
+    importe,
+    detalle,
+    otrosimpuestos,
+    formasDePago,
+  } = data;
+
+  if (!codigo) {
+    throw new Error('Faltan datos obligatorios en la orden de pago');
+  }
+  if (!fecha || !moneda || !id_proveedor || !id_razonsocial || !importe) {
+    throw new Error('Faltan datos obligatorios en la orden de pago');
+  }
+
+  await validarDatos(data);
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [existe] = await connection.query(
+      'SELECT codigo FROM orden_pago WHERE codigo = ? FOR UPDATE',
+      [codigo]
+    );
+    if (existe.length === 0) {
+      throw new Error('La orden de pago no existe');
+    }
+
+    const detalleViejo = await pagosModel.getDetalleOrdenPago(connection, codigo);
+    for (const item of detalleViejo) {
+      const importeViejo = Number(item.importe) || 0;
+      if (item.codigo_factura_compra) {
+        await pagosModel.restoreSaldoFactura(connection, importeViejo, item.codigo_factura_compra);
+      } else if (item.codigo_notacredito_compra) {
+        await pagosModel.restoreSaldoNotaCredito(connection, importeViejo, item.codigo_notacredito_compra);
+      }
+    }
+
+    await pagosModel.borrarDetalleOrdenPago(connection, codigo);
+    await pagosModel.borrarOtrosImpuestosOrdenPago(connection, codigo);
+    await pagosModel.borrarFormasPagoOrdenPago(connection, codigo);
+
+    await pagosModel.updateOrdenPago(connection, codigo, [
+      fecha,
+      moneda,
+      ctz || 1,
+      id_proveedor,
+      id_razonsocial,
+      importe,
+      idUsuario || null,
+    ]);
+
+    if (Array.isArray(detalle) && detalle.length > 0) {
+      for (const item of detalle) {
+        const detCodigo = item.codigo_factura_compra;
+        const importeNum = Number(item.importe) || 0;
+        const esNotaCredito = detCodigo.startsWith('NCC');
+
+        await pagosModel.insertDetalleOrdenPago(connection, [
+          codigo,
+          esNotaCredito ? null : detCodigo,
+          esNotaCredito ? detCodigo : null,
+          importeNum,
+        ]);
+
+        if (esNotaCredito) {
+          await pagosModel.updateSaldoNotaCredito(connection, importeNum, detCodigo);
+        } else {
+          await pagosModel.updateSaldoFactura(connection, importeNum, detCodigo);
+        }
+      }
+    }
+
+    if (otrosimpuestos?.length) {
+      const data = otrosimpuestos.map(i => [
+        codigo,
+        i.codigo_impuesto,
+        i.valor,
+      ]);
+      await pagosModel.insertOtrosImpuestos(connection, data);
+    }
+
+    if (formasDePago?.length) {
+      const pagos = formasDePago.map(p => [
+        codigo,
+        p.codigo_valor,
+        p.fecha,
+        p.importe,
+      ]);
+      await pagosModel.insertFormasPago(connection, pagos);
+    }
+
+    await connection.commit();
+    return codigo;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
 const getAll = async () => {
   const connection = await db.getConnection();
   try {
@@ -194,6 +311,7 @@ const getByProveedor = async (idProveedor, idRazonSocial) => {
 
 module.exports = {
   create,
+  update,
   getAll,
   getByProveedor,
 };

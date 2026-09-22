@@ -5,6 +5,7 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const resolvePersonal = require('../middlewares/resolvePersonalMiddleware');
 
 router.post('/', authMiddleware, resolvePersonal, pagosController.create);
+router.put('/:codigo', authMiddleware, resolvePersonal, pagosController.update);
 router.get('/', pagosController.getAll);
 router.get('/pagos/proveedor', pagosController.getByProveedor);
 
