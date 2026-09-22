@@ -50,7 +50,7 @@ const insertMovimientos = async (connection, movimientosData) => {
       id_articulo, id_concepto, id_herramienta, id_epp,
       unidad, nombre, cantidad, precio, descuento, precio_final,
       importe, codigo_orden, iva_compras, codigo_remito,
-      activo, cantidad_remitos, saldo
+      activo, cantidad_remitos, saldo, saldo_item
     ) VALUES ?`;
   await connection.query(query, [movimientosData]);
 };
@@ -356,7 +356,7 @@ const updateFactura = async (connection, params) => {
     codigoFactura, fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz,
     id_proveedor, id_plancompra, id_motivo, idServicioFinal, idMovilFinal,
     id_responsable, id_razonsocial, totalIVA21, totalIVA27, totalIVA10,
-    bonificacion, periodoiva, importe, observacion, estado, saldoFinal
+    bonificacion, periodoiva, importe, observacion, estado, pagada, saldoFinal
   } = params;
 
   const query = `
@@ -364,7 +364,7 @@ const updateFactura = async (connection, params) => {
       fecha = ?, tipoCmp = ?, codigoletra = ?, ptoVta = ?, NroCmp = ?, moneda = ?, ctz = ?,
       id_proveedor = ?, id_plancompra = ?, id_motivo = ?, id_servicio = ?, id_movil = ?,
       id_responsable = ?, id_razonsocial = ?, totalIVA21 = ?, totalIVA27 = ?, totalIVA10 = ?,
-      bonificacion = ?, periodoiva = ?, importe = ?, observacion = ?, Estado = ?, saldo = ?
+      bonificacion = ?, periodoiva = ?, importe = ?, observacion = ?, Estado = ?, pagada = ?, saldo = ?
     WHERE codigo = ?`;
 
   const values = [
@@ -376,6 +376,7 @@ const updateFactura = async (connection, params) => {
     periodoiva || null,
     importe, observacion || null,
     estado || 'Completa',
+    pagada !== undefined ? pagada : 0,
     saldoFinal,
     codigoFactura
   ];
@@ -400,7 +401,7 @@ const insertFacturaMovimientosUpdate = async (connection, movimientosData) => {
     INSERT INTO movimientos_factura_compras (
       codigo_factura_compra, tipo_movimiento, id_articulo, id_concepto, id_herramienta,
       unidad, nombre, cantidad, precio, descuento, precio_final, importe, codigo_orden,
-      iva_compras, codigo_remito, activo, cantidad_remitos, saldo
+      iva_compras, codigo_remito, activo, cantidad_remitos, saldo, saldo_item
     ) VALUES ?`;
   await connection.query(query, [movimientosData]);
 };

@@ -21,6 +21,28 @@ const extraerCodigoRelacion = (r) =>
     ? r
     : (r?.codigo ?? r?.codigo_orden ?? r?.codigo_remito ?? r?.orden_compra ?? r?.remito ?? null);
 
+const toNumber = (valor) => {
+  if (valor == null || valor === '') return 0;
+  const limpio = String(valor).replace(/\./g, '').replace(',', '.');
+  const numero = parseFloat(limpio);
+  return isNaN(numero) ? 0 : numero;
+};
+
+const calcularSaldoItem = (item) => {
+  const cantidad = toNumber(item.cantidad);
+  const cantidadRemito = toNumber(item.cantidad_remito ?? item.cantidad_remitos);
+  if (item.saldo_items != null && item.saldo_items !== '') {
+    return toNumber(item.saldo_items);
+  }
+  return cantidad - cantidadRemito;
+};
+
+const calcularEstadoFactura = (item) => {
+  if (!Array.isArray(item) || item.length === 0) return null;
+  const incompleta = item.some((it) => calcularSaldoItem(it) > 0);
+  return incompleta ? 'Incompleta' : 'Completa';
+};
+
 const generarCodigoFactura = async (connection) => {
   const [rows] = await connection.query(
     'SELECT MAX(codigo) AS ultimo FROM factura_compra FOR UPDATE'
@@ -78,6 +100,7 @@ const create = async (data, idPersonal) => {
   const saldoFinal = typeof saldo === 'number' && !isNaN(saldo) ? saldo : 0;
   const idResponsable = data.id_responsable || null;
   const idCreacion = data.id_creacion || idPersonal || null;
+  const estadoFinal = calcularEstadoFactura(item) || estado || 'Completa';
 
   const connection = await facturacompraModel.getConnection();
   let codigoFactura;
@@ -113,7 +136,7 @@ const create = async (data, idPersonal) => {
           periodoiva,
           importe,
           observacion,
-          estado,
+          estado: estadoFinal,
           saldoFinal
         });
         break;
@@ -147,11 +170,16 @@ const create = async (data, idPersonal) => {
         descuento,
         codigo_remito,
         cantidad_remitos,
-        saldo
+        cantidad_remito,
+        saldo,
+        saldo_items
       }) => {
         if (!nombre || !unidad || cantidad == null || precio_final == null) {
           throw new Error(`Datos incompletos para el item: ${JSON.stringify({ nombre, unidad, cantidad, precio_final })}`);
         }
+
+        const cantidadRemito = toNumber(cantidad_remito ?? cantidad_remitos);
+        const saldoItem = toNumber(saldo_items ?? (toNumber(cantidad) - cantidadRemito));
 
         return [
           codigoFactura,
@@ -171,8 +199,9 @@ const create = async (data, idPersonal) => {
           iva_compras ?? 0,
           codigo_remito ?? null,
           1,
-          cantidad_remitos ?? 0,
-          saldo ?? 0
+          cantidadRemito,
+          toNumber(saldo),
+          saldoItem
         ];
       });
 
@@ -435,15 +464,13 @@ const update = async (codigoFactura, data) => {
       idMovilFinal = null;
     }
 
-    let saldoFinal = typeof saldo === 'number' && !isNaN(saldo) ? saldo : 0;
+    const formasPagoFinales = Array.isArray(formasDePago) ? formasDePago : [];
+    const esCuentaCorriente = formasPagoFinales.some((fp) => fp.codigo_valor === 'CC');
 
-    if (formasDePago && formasDePago.length > 0) {
-      for (const fp of formasDePago) {
-        if (fp.codigo_valor === 'CC') {
-          saldoFinal = (importe || 0) - (saldo || 0);
-        }
-      }
-    }
+    let saldoFinal = esCuentaCorriente ? (importe || 0) : 0;
+    const pagada = esCuentaCorriente ? 0 : 1;
+
+    const estadoFinal = calcularEstadoFactura(item) || estado || 'Completa';
 
     await facturacompraModel.updateFactura(connection, {
       codigoFactura,
@@ -468,7 +495,8 @@ const update = async (codigoFactura, data) => {
       periodoiva,
       importe,
       observacion,
-      estado,
+      estado: estadoFinal,
+      pagada,
       saldoFinal
     });
 
@@ -478,8 +506,12 @@ const update = async (codigoFactura, data) => {
       const movimientosData = item.map(({
         tipo_operacion, id_articulo, id_concepto, id_herramienta,
         unidad, nombre, cantidad, descuento, precio_final, importe,
-        codigo_orden, iva_compras, codigo_remito, cantidad_remitos, saldo
+        codigo_orden, iva_compras, codigo_remito, cantidad_remitos,
+        cantidad_remito, saldo, saldo_items
       }) => {
+        const cantidadRemito = toNumber(cantidad_remito ?? cantidad_remitos);
+        const saldoItem = toNumber(saldo_items ?? (toNumber(cantidad) - cantidadRemito));
+
         return [
           codigoFactura,
           tipo_operacion,
@@ -497,8 +529,9 @@ const update = async (codigoFactura, data) => {
           iva_compras || 0,
           codigo_remito || null,
           1,
-          cantidad_remitos || 0.00,
-          saldo || 0.00
+          cantidadRemito,
+          toNumber(saldo),
+          saldoItem
         ];
       });
 
