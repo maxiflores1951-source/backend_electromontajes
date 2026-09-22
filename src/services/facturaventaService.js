@@ -90,25 +90,22 @@ const create = async (data) => {
     if (detalle && detalle.length > 0) {
       for (const item of detalle) {
         const codigoPresupuesto = item.codigo;
-        const importeTotalFactura = parseFloat(importe) || 0;
+        const importeItem = parseFloat(item.importe) || 0;
+
+        if (!codigoPresupuesto || !importeItem) continue;
 
         if (codigoletra === 'A' || codigoletra === 'M') {
-          const saldoSinIvaRestar = importeTotalFactura / 1.21;
-          const saldoIvaRestar = importeTotalFactura;
-
           await facturaventaModel.updatePresupuestoSaldoAM(
             connection,
-            saldoIvaRestar,
-            saldoSinIvaRestar,
+            importeItem,
+            importeItem / 1.21,
             codigoPresupuesto
           );
         } else {
-          const saldoIvaRestar = importeTotalFactura * 1.21;
-
           await facturaventaModel.updatePresupuestoSaldoOther(
             connection,
-            importeTotalFactura,
-            saldoIvaRestar,
+            importeItem,
+            importeItem * 1.21,
             codigoPresupuesto
           );
         }
@@ -206,6 +203,35 @@ const update = async (codigo, data) => {
   try {
     await connection.beginTransaction();
 
+    const facturaAnterior = await facturaventaModel.getByCodigo(codigo);
+    const detalleAnterior = await facturaventaModel.getDetalle(codigo);
+    const letraAnterior = facturaAnterior?.codigoletra;
+
+    if (detalleAnterior && detalleAnterior.length > 0) {
+      for (const detalleViejo of detalleAnterior) {
+        const codigoPresupuesto = detalleViejo.codigo_presupuesto;
+        const importeItem = parseFloat(detalleViejo.importe) || 0;
+
+        if (!codigoPresupuesto || !importeItem) continue;
+
+        if (letraAnterior === 'A' || letraAnterior === 'M') {
+          await facturaventaModel.restorePresupuestoSaldoAM(
+            connection,
+            importeItem,
+            importeItem / 1.21,
+            codigoPresupuesto
+          );
+        } else {
+          await facturaventaModel.restorePresupuestoSaldoOther(
+            connection,
+            importeItem,
+            importeItem * 1.21,
+            codigoPresupuesto
+          );
+        }
+      }
+    }
+
     const periodo_iva = fecha.substring(0, 7);
 
     await facturaventaModel.update(connection, {
@@ -233,13 +259,37 @@ const update = async (codigo, data) => {
     await facturaventaModel.deleteFormasPago(connection, codigo);
 
     if (detalle && detalle.length > 0) {
-      const detalleData = detalle.map(({ descripcion, iva, importe }) => [
+      const detalleData = detalle.map(({ codigo: codigoPresupuesto, descripcion, iva, importe }) => [
         codigo,
+        codigoPresupuesto,
         descripcion,
         iva,
         importe,
       ]);
-      await facturaventaModel.insertDetalleSinPresupuesto(connection, detalleData);
+      await facturaventaModel.insertDetalle(connection, detalleData);
+
+      for (const item of detalle) {
+        const codigoPresupuesto = item.codigo;
+        const importeItem = parseFloat(item.importe) || 0;
+
+        if (!codigoPresupuesto || !importeItem) continue;
+
+        if (codigoletra === 'A' || codigoletra === 'M') {
+          await facturaventaModel.updatePresupuestoSaldoAM(
+            connection,
+            importeItem,
+            importeItem / 1.21,
+            codigoPresupuesto
+          );
+        } else {
+          await facturaventaModel.updatePresupuestoSaldoOther(
+            connection,
+            importeItem,
+            importeItem * 1.21,
+            codigoPresupuesto
+          );
+        }
+      }
     }
 
     if (otrosimpuestos && otrosimpuestos.length > 0) {

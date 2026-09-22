@@ -62,23 +62,49 @@ const insert = async (connection, data) => {
 const updatePresupuestoSaldoAM = async (connection, saldoIvaRestar, saldoSinIvaRestar, codigoPresupuesto) => {
   const query = `
     UPDATE presupuesto
-    SET saldo_iva = saldo_iva - ?,
+    SET saldo = saldo - ?,
+        saldo_iva = saldo_iva - ?,
         saldo_sin_iva = saldo_sin_iva - ?
     WHERE codigo = ?
   `;
   const exec = connection ? connection.query.bind(connection) : db.query;
-  await exec(query, [saldoIvaRestar, saldoSinIvaRestar, codigoPresupuesto]);
+  await exec(query, [saldoIvaRestar, saldoIvaRestar, saldoSinIvaRestar, codigoPresupuesto]);
 };
 
 const updatePresupuestoSaldoOther = async (connection, importeTotalFactura, saldoIvaRestar, codigoPresupuesto) => {
   const query = `
     UPDATE presupuesto
-    SET saldo_sin_iva = saldo_sin_iva - ?,
+    SET saldo = saldo - ?,
+        saldo_sin_iva = saldo_sin_iva - ?,
         saldo_iva = saldo_iva - ?
     WHERE codigo = ?
   `;
   const exec = connection ? connection.query.bind(connection) : db.query;
-  await exec(query, [importeTotalFactura, saldoIvaRestar, codigoPresupuesto]);
+  await exec(query, [importeTotalFactura, importeTotalFactura, saldoIvaRestar, codigoPresupuesto]);
+};
+
+const restorePresupuestoSaldoAM = async (connection, saldoIvaRestar, saldoSinIvaRestar, codigoPresupuesto) => {
+  const query = `
+    UPDATE presupuesto
+    SET saldo = saldo + ?,
+        saldo_iva = saldo_iva + ?,
+        saldo_sin_iva = saldo_sin_iva + ?
+    WHERE codigo = ?
+  `;
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  await exec(query, [saldoIvaRestar, saldoIvaRestar, saldoSinIvaRestar, codigoPresupuesto]);
+};
+
+const restorePresupuestoSaldoOther = async (connection, importeTotalFactura, saldoIvaRestar, codigoPresupuesto) => {
+  const query = `
+    UPDATE presupuesto
+    SET saldo = saldo + ?,
+        saldo_sin_iva = saldo_sin_iva + ?,
+        saldo_iva = saldo_iva + ?
+    WHERE codigo = ?
+  `;
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  await exec(query, [importeTotalFactura, importeTotalFactura, saldoIvaRestar, codigoPresupuesto]);
 };
 
 const insertDetalle = async (connection, detalleData) => {
@@ -224,6 +250,14 @@ const getDetalle = async (codigo) => {
   `;
   const [rows] = await db.query(query, [codigo]);
   return rows;
+};
+
+const getByCodigo = async (codigo) => {
+  const query = `
+    SELECT * FROM factura_venta WHERE codigo = ?
+  `;
+  const [rows] = await db.query(query, [codigo]);
+  return rows[0];
 };
 
 const getOtrosImpuestos = async (codigo) => {
@@ -471,6 +505,8 @@ module.exports = {
   insert,
   updatePresupuestoSaldoAM,
   updatePresupuestoSaldoOther,
+  restorePresupuestoSaldoAM,
+  restorePresupuestoSaldoOther,
   insertDetalle,
   insertDetalleSinPresupuesto,
   insertOtrosImpuestos,
@@ -482,6 +518,7 @@ module.exports = {
   updateSaldo,
   getAll,
   getDetalle,
+  getByCodigo,
   getOtrosImpuestos,
   getFormasPago,
   getByRazonSocial,
