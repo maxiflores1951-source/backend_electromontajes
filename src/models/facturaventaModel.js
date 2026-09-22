@@ -151,7 +151,6 @@ const update = async (connection, data) => {
     periodo_iva,
     moneda,
     ctz,
-    id_servicio,
     id_cliente,
     id_razonsocial,
     importe,
@@ -168,7 +167,7 @@ const update = async (connection, data) => {
 
   const query = `
     UPDATE factura_venta SET
-      fecha = ?, periodo_iva = ?, moneda = ?, ctz = ?, id_servicio = ?, id_cliente = ?,
+      fecha = ?, periodo_iva = ?, moneda = ?, ctz = ?, id_cliente = ?,
       id_razonsocial = ?, importe = ?, iva21 = ?, iva27 = ?, iva105 = ?, observacion = ?,
       tipoCmp = ?, codigoletra = ?, ptoVta = ?, NroCmp = ?
     WHERE codigo = ?
@@ -179,7 +178,6 @@ const update = async (connection, data) => {
     periodo_iva,
     moneda,
     ctz || 1,
-    id_servicio || null,
     id_cliente,
     id_razonsocial,
     importe,
