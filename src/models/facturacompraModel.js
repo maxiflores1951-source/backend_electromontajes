@@ -891,6 +891,75 @@ const insertRelacionFacturaRemito = async (codigo, factura) => {
   return result.insertId;
 };
 
+const keyMovimiento = (r) => [r.id_articulo, r.id_concepto, r.id_herramienta, r.id_epp, r.id_epp_variante]
+  .map((x) => (x == null ? '' : String(x))).join('|');
+
+const aplicarPendienteRemito = async (remito, factura) => {
+  const [pendientes] = await db.query(
+    `SELECT id, id_articulo, id_concepto, id_herramienta, id_epp, id_epp_variante,
+            codigo_remito, cantidad_remitos, saldo_item
+     FROM movimientos_factura_compras
+     WHERE codigo_factura_compra = ? AND saldo_item > 0 AND activo = 1
+     ORDER BY id`,
+    [factura]
+  );
+
+  const [items] = await db.query(
+    `SELECT id_articulo, id_concepto, id_herramienta, id_epp, id_epp_variante, cantidad
+     FROM movimientos_remito_compras
+     WHERE codigo_remito_compra = ?`,
+    [remito]
+  );
+
+  const porKey = {};
+  for (const it of items) {
+    const k = keyMovimiento(it);
+    porKey[k] = (porKey[k] || 0) + Number(it.cantidad);
+  }
+
+  const actualizaciones = [];
+  for (const m of pendientes) {
+    const k = keyMovimiento(m);
+    let qty = porKey[k] || 0;
+    if (qty <= 0) continue;
+
+    if (m.codigo_remito === remito) {
+      qty = Math.max(qty - Number(m.cantidad_remitos || 0), 0);
+    }
+    if (qty <= 0) continue;
+
+    const resta = Math.min(Number(m.saldo_item), qty);
+    if (resta <= 0) continue;
+
+    porKey[k] = qty - resta;
+    actualizaciones.push([Number(m.saldo_item) - resta, m.id]);
+  }
+
+  for (const [nuevoSaldo, id] of actualizaciones) {
+    await db.query('UPDATE movimientos_factura_compras SET saldo_item = ? WHERE id = ?', [nuevoSaldo, id]);
+  }
+
+  return actualizaciones.length;
+};
+
+const setEstadoFactura = async (codigo, estado) => {
+  const [result] = await db.query(
+    'UPDATE factura_compra SET estado = ? WHERE codigo = ?',
+    [estado, codigo]
+  );
+  return result.affectedRows;
+};
+
+const restablecerSaldoRemitoDesvinculado = async (remito, factura) => {
+  const [result] = await db.query(
+    `UPDATE movimientos_factura_compras
+     SET saldo_item = GREATEST(cantidad - cantidad_remitos, 0)
+     WHERE codigo_factura_compra = ? AND codigo_remito = ?`,
+    [factura, remito]
+  );
+  return result.affectedRows;
+};
+
 const getIndicadoresFormaPago = async () => {
   const [rows] = await db.query(`
     SELECT
@@ -1030,6 +1099,9 @@ module.exports = {
   insertRelacionOrden,
   insertRelacionFacturaOrden,
   insertRelacionFacturaRemito,
+  aplicarPendienteRemito,
+  setEstadoFactura,
+  restablecerSaldoRemitoDesvinculado,
   getIndicadoresFormaPago,
   getTotalesSaldo,
   getSaldosPorProveedor,

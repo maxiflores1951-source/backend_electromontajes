@@ -1,5 +1,24 @@
 const facturacompraModel = require('../models/facturacompraModel');
 
+const normalizarDocumento = (item) => {
+  const proveedorNombre = item.nombre_proveedor || item.razon_social_proveedor || item.razon_social || null;
+  const proveedorCuit = item.cuil_proveedor || item.cuit_proveedor || item.cuil_razon_social || item.cuit || null;
+  const codigoDocumento = item.codigo_documento || item.codigo || null;
+  const descripcionComprobante = item.descripcion_comprobante || item.descripcion || item.nombre_impuesto || null;
+  const numeroComprobante = item.NroCmp || item.numero_factura || item.nro_factura || null;
+  const puntoVenta = item.ptoVta || null;
+
+  return {
+    ...item,
+    proveedorNombre,
+    proveedorCuit,
+    codigoDocumento,
+    descripcionComprobante,
+    numeroComprobante,
+    puntoVenta
+  };
+};
+
 const parseFecha = (valor) => {
   if (!valor) return 0;
   const partes = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(valor));
@@ -41,6 +60,14 @@ const calcularEstadoFactura = (item) => {
   if (!Array.isArray(item) || item.length === 0) return null;
   const incompleta = item.some((it) => calcularSaldoItem(it) > 0);
   return incompleta ? 'Incompleta' : 'Completa';
+};
+
+const calcularEstadoEfectivo = (movimientos, estadoAlmacenado) => {
+  if (estadoAlmacenado === 'Pendiente') return 'Pendiente';
+  const tienePendientes = Array.isArray(movimientos) && movimientos.some(
+    (m) => calcularSaldoItem({ cantidad: m.cantidad, cantidad_remitos: m.cantidad_remitos, saldo_items: m.saldo_item }) > 0
+  );
+  return tienePendientes ? 'Incompleta' : 'Completa';
 };
 
 const generarCodigoFactura = async (connection) => {
@@ -100,7 +127,8 @@ const create = async (data, idPersonal) => {
   const saldoFinal = typeof saldo === 'number' && !isNaN(saldo) ? saldo : 0;
   const idResponsable = data.id_responsable || null;
   const idCreacion = data.id_creacion || idPersonal || null;
-  const estadoFinal = calcularEstadoFactura(item) || estado || 'Completa';
+  const estadoCalculado = calcularEstadoFactura(item);
+  const estadoFinal = estadoCalculado === 'Incompleta' ? (estado || 'Completa') : (estado || estadoCalculado || 'Completa');
 
   const connection = await facturacompraModel.getConnection();
   let codigoFactura;
@@ -319,6 +347,7 @@ const getAll = async () => {
 
     return {
       ...factura,
+      estado: calcularEstadoEfectivo(movimientos, factura.estado),
       movimientos,
       otrosImpuestos,
       formasPago
@@ -357,6 +386,7 @@ const filtrar = async (desde, hasta) => {
     return {
       tipo_documento: 'factura',
       ...factura,
+      estado: calcularEstadoEfectivo(movimientos, factura.estado),
       movimientos,
       otrosImpuestos,
       formasPago
@@ -404,6 +434,7 @@ const getFacturasPendientes = async () => {
 
     return {
       ...factura,
+      estado: calcularEstadoEfectivo(movimientos, factura.estado),
       movimientos,
       otrosImpuestos,
       formasPago
@@ -470,7 +501,8 @@ const update = async (codigoFactura, data) => {
     let saldoFinal = esCuentaCorriente ? (importe || 0) : 0;
     const pagada = esCuentaCorriente ? 0 : 1;
 
-    const estadoFinal = calcularEstadoFactura(item) || estado || 'Completa';
+    const estadoCalculado = calcularEstadoFactura(item);
+    const estadoFinal = estadoCalculado === 'Incompleta' ? (estado || 'Completa') : (estado || estadoCalculado || 'Completa');
 
     await facturacompraModel.updateFactura(connection, {
       codigoFactura,
@@ -597,6 +629,7 @@ const getFacturasSinPeriodoIva = async () => {
 
     return {
       ...factura,
+      estado: calcularEstadoEfectivo(movimientos, factura.estado),
       movimientos,
       otrosImpuestos,
       formasPago
@@ -620,6 +653,7 @@ const getFacturasPorProveedor = async (idProveedor, idRazonSocial) => {
 
     return {
       ...factura,
+      estado: calcularEstadoEfectivo(movimientos, factura.estado),
       movimientos,
       otrosImpuestos,
       formasPago
@@ -654,6 +688,7 @@ const getFacturasPorRazonSocial = async (idRazonSocial) => {
     return {
       tipo_documento: 'factura',
       ...factura,
+      estado: calcularEstadoEfectivo(movimientos, factura.estado),
       movimientos,
       otrosImpuestos,
       formasPago
@@ -691,21 +726,22 @@ const filtrarCostos = async (desde, hasta) => {
   const connection = await facturacompraModel.getConnection();
 
   try {
-    const facturasCompra = await facturacompraModel.getFacturasCostos(desdeCompleto, hastaCompleto, connection);
+const facturasCompra = await facturacompraModel.getFacturasCostos(desdeCompleto, hastaCompleto, connection);
 
-    const facturasCompletas = await Promise.all(facturasCompra.map(async (factura) => {
-      const movimientos = await facturacompraModel.getMovimientosFactura(factura.codigo);
-      const otrosImpuestos = await facturacompraModel.getOtrosImpuestosFactura(factura.codigo);
-      const formasPago = await facturacompraModel.getFormasPagoFactura(factura.codigo);
+      const facturasCompletas = await Promise.all(facturasCompra.map(async (factura) => {
+        const movimientos = await facturacompraModel.getMovimientosFactura(factura.codigo);
+        const otrosImpuestos = await facturacompraModel.getOtrosImpuestosFactura(factura.codigo);
+        const formasPago = await facturacompraModel.getFormasPagoFactura(factura.codigo);
 
-      return {
-        tipo: 'factura_compra',
-        ...factura,
-        movimientos,
-        otrosImpuestos,
-        formasPago
-      };
-    }));
+        return {
+          tipo: 'factura_compra',
+          ...factura,
+          estado: calcularEstadoEfectivo(movimientos, factura.estado),
+          movimientos,
+          otrosImpuestos,
+          formasPago
+        };
+      }));
 
     const otrosPagos = await facturacompraModel.getOtrosPagos(desdeCompleto, hastaCompleto, connection);
 
@@ -754,13 +790,14 @@ const filtrarCostosTodos = async (desde, hasta) => {
       const otrosImpuestos = await facturacompraModel.getOtrosImpuestosFactura(factura.codigo);
       const formasPago = await facturacompraModel.getFormasPagoFactura(factura.codigo);
 
-      return {
+      return normalizarDocumento({
         tipo: 'factura_compra',
         ...factura,
+        estado: calcularEstadoEfectivo(movimientos, factura.estado),
         movimientos,
         otrosImpuestos,
         formasPago
-      };
+      });
     }));
 
     const notasCredito = await facturacompraModel.getNotasCreditoCostos(desdeCompleto, hastaCompleto, connection);
@@ -770,13 +807,13 @@ const filtrarCostosTodos = async (desde, hasta) => {
       const otrosImpuestos = await facturacompraModel.getOtrosImpuestosNotaCredito(nota.codigo);
       const formasPago = await facturacompraModel.getFormasPagoNotaCredito(nota.codigo);
 
-      return {
+      return normalizarDocumento({
         tipo: 'nota_credito_compra',
         ...nota,
         movimientos,
         otrosImpuestos,
         formasPago
-      };
+      });
     }));
 
     const otrosPagos = await facturacompraModel.getOtrosPagos(desdeCompleto, hastaCompleto, connection);
@@ -785,12 +822,12 @@ const filtrarCostosTodos = async (desde, hasta) => {
       const detalles = await facturacompraModel.getDetallesOtrosPagos(pago.codigo);
       const formasPago = await facturacompraModel.getFormasPagoOtrosPagos(pago.codigo);
 
-      return {
+      return normalizarDocumento({
         tipo: 'otro_pago',
         ...pago,
         detalles,
         formasPago
-      };
+      });
     }));
 
     const ordenesPago = await facturacompraModel.getOrdenesPago(desdeCompleto, hastaCompleto, connection);
@@ -800,16 +837,22 @@ const filtrarCostosTodos = async (desde, hasta) => {
       const formasPago = await facturacompraModel.getFormasPagoOrdenPago(orden.codigo);
       const otrosImpuestos = await facturacompraModel.getOtrosImpuestosOrdenPago(orden.codigo);
 
-      return {
+      return normalizarDocumento({
         tipo: 'orden_pago',
         ...orden,
         detalle,
         formasPago,
         otrosImpuestos
-      };
+      });
     }));
 
     const impuestos = await facturacompraModel.getImpuestos(desdeCompleto, hastaCompleto, connection);
+    const impuestosNormalizados = impuestos.map((imp) =>
+      normalizarDocumento({
+        tipo: 'impuesto',
+        ...imp
+      })
+    );
 
     const pagosTotales = [...facturasCompletas, ...notasCreditoCompletas, ...otrosPagosCompletos, ...ordenesPagoCompletas];
 
@@ -821,9 +864,9 @@ const filtrarCostosTodos = async (desde, hasta) => {
       totalNotasCredito: notasCreditoCompletas.length,
       totalOtrosPagos: otrosPagosCompletos.length,
       totalOrdenesPago: ordenesPagoCompletas.length,
-      totalImpuestos: impuestos.length,
+      totalImpuestos: impuestosNormalizados.length,
       pagos: pagosTotales,
-      impuestos
+      impuestos: impuestosNormalizados
     };
   } finally {
     await facturacompraModel.release(connection);
@@ -869,6 +912,15 @@ const crearRelacionFactura = async (data) => {
     insertId = await facturacompraModel.insertRelacionFacturaOrden(codigo, factura);
   } else {
     insertId = await facturacompraModel.insertRelacionFacturaRemito(codigo, factura);
+
+    const afectados = await facturacompraModel.aplicarPendienteRemito(codigo, factura);
+    if (afectados > 0) {
+      const movimientos = await facturacompraModel.getMovimientosFactura(factura);
+      const tienePendientes = Array.isArray(movimientos) && movimientos.some((m) => toNumber(m.saldo_item) > 0);
+      if (!tienePendientes) {
+        await facturacompraModel.setEstadoFactura(factura, 'Completa');
+      }
+    }
   }
 
   return { tipo, insertId };
@@ -900,6 +952,10 @@ const eliminarRelacionFactura = async (data) => {
     affectedRows = await facturacompraModel.deleteRelacionOrdenFactura(codigo, factura);
   } else {
     affectedRows = await facturacompraModel.deleteRelacionRemitoFactura(codigo, factura);
+
+    if (affectedRows > 0) {
+      await facturacompraModel.restablecerSaldoRemitoDesvinculado(codigo, factura);
+    }
   }
 
   if (affectedRows === 0) {
