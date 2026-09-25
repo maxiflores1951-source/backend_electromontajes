@@ -7,6 +7,11 @@ const create = async (data) => {
   return id;
 };
 
+const getUltimoPrecio = async (codArticulo, codPrecio = 'PC0') => {
+  return await preciosModel.getUltimoPrecio(codArticulo, codPrecio);
+};
+
 module.exports = {
   create,
+  getUltimoPrecio,
 };

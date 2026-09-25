@@ -46,9 +46,12 @@ const getAll = async (connection) => {
       mv.kilometraje AS kilometraje_movil,
       r.razon_social AS razon_social,
       r.cuil AS cuil_razon_social,
+      p.Nombre_Prov AS nombre_proveedor,
+      p.Razon_Social AS razon_social_proveedor,
+      p.Cuilt AS cuil_proveedor,
       pc.descripcion AS nombre_plan,
-      p.NOMBRE AS nombre_responsable,
-      p.DNI AS dni_responsable,
+      per.NOMBRE AS nombre_responsable,
+      per.DNI AS dni_responsable,
       op.id_creado,
       pc2.NOMBRE AS nombre_creado,
       op.id_modificado,
@@ -60,8 +63,9 @@ const getAll = async (connection) => {
       LEFT JOIN servicios s ON op.id_servicio = s.IDOBRA
       LEFT JOIN moviles mv ON op.id_movil = mv.nro_ident
       LEFT JOIN razones_sociales r ON op.id_razonsocial = r.id
+      LEFT JOIN proveedor p ON op.id_proveedor = p.Cod_Proveedor
       LEFT JOIN plandecompra pc ON op.id_plancompra = pc.codigo
-      LEFT JOIN personal p ON op.id_responsable = p.ID
+      LEFT JOIN personal per ON op.id_responsable = per.ID
       LEFT JOIN personal pc2 ON pc2.ID = op.id_creado
       LEFT JOIN personal pc3 ON pc3.ID = op.id_modificado
     ORDER BY 
@@ -82,9 +86,12 @@ const getByCodigo = async (connection, codigo) => {
       mv.kilometraje AS kilometraje_movil,
       r.razon_social AS razon_social,
       r.cuil AS cuil_razon_social,
+      p.Nombre_Prov AS nombre_proveedor,
+      p.Razon_Social AS razon_social_proveedor,
+      p.Cuilt AS cuil_proveedor,
       pc.descripcion AS nombre_plan,
-      p.NOMBRE AS nombre_responsable,
-      p.DNI AS dni_responsable,
+      per.NOMBRE AS nombre_responsable,
+      per.DNI AS dni_responsable,
       op.id_creado,
       pc2.NOMBRE AS nombre_creado,
       op.id_modificado,
@@ -95,8 +102,9 @@ const getByCodigo = async (connection, codigo) => {
       LEFT JOIN servicios s ON op.id_servicio = s.IDOBRA
       LEFT JOIN moviles mv ON op.id_movil = mv.nro_ident
       LEFT JOIN razones_sociales r ON op.id_razonsocial = r.id
+      LEFT JOIN proveedor p ON op.id_proveedor = p.Cod_Proveedor
       LEFT JOIN plandecompra pc ON op.id_plancompra = pc.codigo
-      LEFT JOIN personal p ON op.id_responsable = p.ID
+      LEFT JOIN personal per ON op.id_responsable = per.ID
       LEFT JOIN personal pc2 ON pc2.ID = op.id_creado
       LEFT JOIN personal pc3 ON pc3.ID = op.id_modificado
     WHERE op.codigo = ?

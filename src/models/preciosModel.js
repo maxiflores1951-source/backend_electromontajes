@@ -6,6 +6,13 @@ const insert = async (data) => {
   return result.insertId;
 };
 
+const getUltimoPrecio = async (codArticulo, codPrecio = 'PC0') => {
+  const query = 'SELECT precio FROM historial_precios WHERE cod_articulo = ? AND cod_precio = ? ORDER BY fecha DESC LIMIT 1';
+  const [rows] = await db.execute(query, [codArticulo, codPrecio]);
+  return rows[0]?.precio ?? null;
+};
+
 module.exports = {
   insert,
+  getUltimoPrecio,
 };

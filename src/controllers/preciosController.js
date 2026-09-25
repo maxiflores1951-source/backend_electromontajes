@@ -12,6 +12,21 @@ const create = async (req, res) => {
   }
 };
 
+const getUltimoPrecio = async (req, res) => {
+  try {
+    const { cod_articulo } = req.params;
+    const { cod_precio = 'PC0' } = req.query;
+    const precio = await preciosService.getUltimoPrecio(cod_articulo, cod_precio);
+    if (precio === null) {
+      return res.status(404).json({ message: 'No hay historial de precios para este artículo' });
+    }
+    res.json({ precio });
+  } catch (err) {
+    res.status(500).json({ message: 'Error interno al obtener último precio' });
+  }
+};
+
 module.exports = {
   create,
+  getUltimoPrecio,
 };
