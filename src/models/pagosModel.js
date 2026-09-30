@@ -29,23 +29,25 @@ const insertDetalleOrdenPago = async (connection, values) => {
 };
 
 const updateSaldoNotaCredito = async (connection, importeNum, codigo) => {
+  const importe = Math.abs(Number(importeNum) || 0);
   const query = `
     UPDATE nota_credito_compra
     SET saldo = saldo - ?,
-        pagada = IF(saldo - ? <= 0, 1, 0)
+        pagada = IF(saldo <= 0, 1, 0)
     WHERE codigo = ?
   `;
-  await connection.query(query, [importeNum, importeNum, codigo]);
+  await connection.query(query, [importe, codigo]);
 };
 
 const updateSaldoFactura = async (connection, importeNum, codigo) => {
+  const importe = Math.abs(Number(importeNum) || 0);
   const query = `
     UPDATE factura_compra
     SET saldo = saldo - ?,
-        pagada = IF(saldo - ? <= 0, 1, 0)
+        pagada = IF(saldo <= 0, 1, 0)
     WHERE codigo = ?
   `;
-  await connection.query(query, [importeNum, importeNum, codigo]);
+  await connection.query(query, [importe, codigo]);
 };
 
 const insertOtrosImpuestos = async (connection, data) => {
@@ -80,23 +82,25 @@ const getDetalleOrdenPago = async (connection, codigoOrdenPago) => {
 };
 
 const restoreSaldoFactura = async (connection, importeNum, codigo) => {
+  const importe = Math.abs(Number(importeNum) || 0);
   const query = `
     UPDATE factura_compra
     SET saldo = saldo + ?,
-        pagada = IF(saldo + ? > 0, 0, 1)
+        pagada = IF(saldo > 0, 0, 1)
     WHERE codigo = ?
   `;
-  await connection.query(query, [importeNum, importeNum, codigo]);
+  await connection.query(query, [importe, codigo]);
 };
 
 const restoreSaldoNotaCredito = async (connection, importeNum, codigo) => {
+  const importe = Math.abs(Number(importeNum) || 0);
   const query = `
     UPDATE nota_credito_compra
     SET saldo = saldo + ?,
-        pagada = IF(saldo + ? > 0, 0, 1)
+        pagada = IF(saldo > 0, 0, 1)
     WHERE codigo = ?
   `;
-  await connection.query(query, [importeNum, importeNum, codigo]);
+  await connection.query(query, [importe, codigo]);
 };
 
 const borrarDetalleOrdenPago = async (connection, codigoOrdenPago) => {
@@ -279,11 +283,15 @@ const getFacturasByPago = async (codigo) => {
       dop.importe AS importe_pagado
     FROM detalle_orden_pago dop
     JOIN factura_compra fc ON fc.codigo = dop.codigo_factura_compra
-    JOIN tipocomprobante tc ON fc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(fc.tipoCmp, 3, '0') = tc.codigo
     WHERE dop.codigo_orden_pago = ?
   `;
   const [rows] = await db.query(query, [codigo]);
-  return rows;
+  return rows.map((row) =>
+    row.tipoCmp === null || row.tipoCmp === undefined
+      ? row
+      : { ...row, tipoCmp: String(row.tipoCmp).trim().padStart(3, '0') }
+  );
 };
 
 const getImpuestosByPago = async (codigo) => {

@@ -105,7 +105,7 @@ const getNotasCredito = async () => {
     LEFT JOIN motivos m ON ncc.id_motivo = m.codigo
     LEFT JOIN plandecompra pl ON ncc.id_plancompra = pl.codigo
     LEFT JOIN razones_sociales rs ON ncc.id_razonsocial = rs.id
-    LEFT JOIN tipocomprobante tc ON ncc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(ncc.tipoCmp, 3, '0') = tc.codigo
     LEFT JOIN moneda mon ON ncc.moneda = mon.codigo
     LEFT JOIN servicios s ON ncc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON ncc.id_movil = mv.nro_ident
@@ -113,7 +113,11 @@ const getNotasCredito = async () => {
     WHERE ncc.anulada = 0
     ORDER BY ncc.codigo DESC
   `);
-  return rows;
+  return rows.map((row) =>
+    row.tipoCmp === null || row.tipoCmp === undefined
+      ? row
+      : { ...row, tipoCmp: String(row.tipoCmp).trim().padStart(3, '0') }
+  );
 };
 
 const getMovimientosNotaCredito = async (codigo) => {

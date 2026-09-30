@@ -6,6 +6,17 @@ const commit = async (connection) => await connection.commit();
 const rollback = async (connection) => await connection.rollback();
 const release = async (connection) => await connection.release();
 
+// El catalogo tipocomprobante usa siempre 3 digitos con ceros ('003', '081').
+// Hay comprobantes guardados sin los ceros ('3', '81'), que antes no casaban con
+// el JOIN y desaparecian de los listados. Se normaliza en la respuesta para que
+// el front pueda compararlos contra el catalogo y detectar las notas de credito.
+const normalizarTipoComprobanteEnFilas = (rows) =>
+  rows.map((row) =>
+    row.tipoCmp === null || row.tipoCmp === undefined
+      ? row
+      : { ...row, tipoCmp: String(row.tipoCmp).trim().padStart(3, '0') }
+  );
+
 const getLastCodigo = async (connection) => {
   const [result] = await connection.query('SELECT MAX(codigo) AS ultimo FROM factura_compra');
   return result.length > 0 ? result[0].ultimo : null;
@@ -158,14 +169,14 @@ const getFacturas = async () => {
     JOIN motivos m ON fc.id_motivo = m.codigo
     JOIN plandecompra pl ON fc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON fc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON fc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(fc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON fc.moneda = mon.codigo
     LEFT JOIN servicios s ON fc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON fc.id_movil = mv.nro_ident
     WHERE fc.anulada = 0
     ORDER BY fc.codigo DESC;`;
   const [rows] = await db.query(query);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const getMovimientosFactura = async (codigo) => {
@@ -228,14 +239,14 @@ const filtrarFacturas = async (desdeCompleto, hastaCompleto) => {
     JOIN motivos m ON fc.id_motivo = m.codigo
     JOIN plandecompra pl ON fc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON fc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON fc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(fc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON fc.moneda = mon.codigo
     LEFT JOIN servicios s ON fc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON fc.id_movil = mv.nro_ident
     WHERE fc.anulada = 0 AND fc.fecha BETWEEN ? AND ?
     ORDER BY fc.fecha DESC
   `, [desdeCompleto, hastaCompleto]);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const filtrarNotasCredito = async (desdeCompleto, hastaCompleto) => {
@@ -260,14 +271,14 @@ const filtrarNotasCredito = async (desdeCompleto, hastaCompleto) => {
     JOIN motivos m ON ncc.id_motivo = m.codigo
     JOIN plandecompra pl ON ncc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON ncc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON ncc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(ncc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON ncc.moneda = mon.codigo
     LEFT JOIN servicios s ON ncc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON ncc.id_movil = mv.nro_ident
     WHERE ncc.anulada = 0 AND ncc.fecha BETWEEN ? AND ?
     ORDER BY ncc.fecha DESC
   `, [desdeCompleto, hastaCompleto]);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const getMovimientosNotaCredito = async (codigo) => {
@@ -336,14 +347,14 @@ const getFacturasPendientes = async () => {
     JOIN motivos m ON fc.id_motivo = m.codigo
     JOIN plandecompra pl ON fc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON fc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON fc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(fc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON fc.moneda = mon.codigo
     LEFT JOIN servicios s ON fc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON fc.id_movil = mv.nro_ident
     WHERE fc.Estado = 'Pendiente'
     ORDER BY fc.fecha DESC;
   `);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const existeFactura = async (connection, codigo) => {
@@ -427,14 +438,14 @@ const getFacturasSinPeriodoIva = async () => {
     JOIN motivos m ON fc.id_motivo = m.codigo
     JOIN plandecompra pl ON fc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON fc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON fc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(fc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON fc.moneda = mon.codigo
     LEFT JOIN servicios s ON fc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON fc.id_movil = mv.nro_ident
     WHERE fc.anulada = 0 AND fc.periodoiva IS NULL
     ORDER BY fc.codigo DESC;
   `);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const getFacturasPorProveedor = async (idProveedor, idRazonSocial) => {
@@ -448,7 +459,7 @@ const getFacturasPorProveedor = async (idProveedor, idRazonSocial) => {
            pl.descripcion AS nombre_plan,
            rs.razon_social AS razon_social_empresa,
            rs.cuil AS cuit_razon_social,
-           tc.descripcion AS tipo_comprobante,
+           COALESCE(tc.descripcion, fc.tipoCmp) AS tipo_comprobante,
            mon.nombre AS nombre_moneda,
            s.OBRA AS nombre_obra,
            mv.patente AS patente_movil,
@@ -458,7 +469,7 @@ const getFacturasPorProveedor = async (idProveedor, idRazonSocial) => {
     JOIN motivos m ON fc.id_motivo = m.codigo
     JOIN plandecompra pl ON fc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON fc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON fc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(fc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON fc.moneda = mon.codigo
     LEFT JOIN servicios s ON fc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON fc.id_movil = mv.nro_ident
@@ -474,7 +485,7 @@ const getFacturasPorProveedor = async (idProveedor, idRazonSocial) => {
       )
     ORDER BY fc.fecha ASC
   `, [idProveedor, idRazonSocial]);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const getNotasCreditoPorProveedor = async (idProveedor, idRazonSocial) => {
@@ -488,7 +499,7 @@ const getNotasCreditoPorProveedor = async (idProveedor, idRazonSocial) => {
            pl.descripcion AS nombre_plan,
            rs.razon_social AS razon_social_empresa,
            rs.cuil AS cuit_razon_social,
-           tc.descripcion AS tipo_comprobante,
+           COALESCE(tc.descripcion, ncc.tipoCmp) AS tipo_comprobante,
            mon.nombre AS nombre_moneda,
            s.OBRA AS nombre_obra,
            mv.patente AS patente_movil,
@@ -498,7 +509,7 @@ const getNotasCreditoPorProveedor = async (idProveedor, idRazonSocial) => {
     JOIN motivos m ON ncc.id_motivo = m.codigo
     JOIN plandecompra pl ON ncc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON ncc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON ncc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(ncc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON ncc.moneda = mon.codigo
     LEFT JOIN servicios s ON ncc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON ncc.id_movil = mv.nro_ident
@@ -514,7 +525,7 @@ const getNotasCreditoPorProveedor = async (idProveedor, idRazonSocial) => {
       )
     ORDER BY ncc.fecha ASC
   `, [idProveedor, idRazonSocial]);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const getFacturasPorRazonSocial = async (idRazonSocial) => {
@@ -538,7 +549,7 @@ const getFacturasPorRazonSocial = async (idRazonSocial) => {
     JOIN motivos m ON fc.id_motivo = m.codigo
     JOIN plandecompra pl ON fc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON fc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON fc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(fc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON fc.moneda = mon.codigo
     LEFT JOIN servicios s ON fc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON fc.id_movil = mv.nro_ident
@@ -549,7 +560,7 @@ const getFacturasPorRazonSocial = async (idRazonSocial) => {
       AND fc.tipoCmp NOT IN ('990', '991')
     ORDER BY fc.fecha ASC
   `, [idRazonSocial]);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const getNotasCreditoPorRazonSocial = async (idRazonSocial) => {
@@ -573,7 +584,7 @@ const getNotasCreditoPorRazonSocial = async (idRazonSocial) => {
     JOIN motivos m ON ncc.id_motivo = m.codigo
     JOIN plandecompra pl ON ncc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON ncc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON ncc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(ncc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON ncc.moneda = mon.codigo
     LEFT JOIN servicios s ON ncc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON ncc.id_movil = mv.nro_ident
@@ -584,7 +595,7 @@ const getNotasCreditoPorRazonSocial = async (idRazonSocial) => {
       AND ncc.tipoCmp NOT IN ('990', '991')
     ORDER BY ncc.fecha ASC
   `, [idRazonSocial]);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const getFacturasCostos = async (desdeCompleto, hastaCompleto, connection) => {
@@ -611,14 +622,14 @@ const getFacturasCostos = async (desdeCompleto, hastaCompleto, connection) => {
     JOIN motivos m ON fc.id_motivo = m.codigo
     JOIN plandecompra pl ON fc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON fc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON fc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(fc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON fc.moneda = mon.codigo
     LEFT JOIN servicios s ON fc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON fc.id_movil = mv.nro_ident
     WHERE fc.anulada = 0 AND fc.fecha BETWEEN ? AND ?
     ORDER BY fc.fecha DESC;
   `, [desdeCompleto, hastaCompleto]);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const getOtrosPagos = async (desdeCompleto, hastaCompleto, connection) => {
@@ -692,14 +703,14 @@ const getNotasCreditoCostos = async (desdeCompleto, hastaCompleto, connection) =
     JOIN motivos m ON nc.id_motivo = m.codigo
     JOIN plandecompra pl ON nc.id_plancompra = pl.codigo
     JOIN razones_sociales rs ON nc.id_razonsocial = rs.id
-    JOIN tipocomprobante tc ON nc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(nc.tipoCmp, 3, '0') = tc.codigo
     JOIN moneda mon ON nc.moneda = mon.codigo
     LEFT JOIN servicios s ON nc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON nc.id_movil = mv.nro_ident
     WHERE nc.anulada = 0 AND nc.fecha BETWEEN ? AND ?
     ORDER BY nc.fecha DESC;
   `, [desdeCompleto, hastaCompleto]);
-  return rows;
+  return normalizarTipoComprobanteEnFilas(rows);
 };
 
 const getOrdenesPago = async (desdeCompleto, hastaCompleto, connection) => {

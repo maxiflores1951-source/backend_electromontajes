@@ -1,5 +1,10 @@
 const notacreditocompraModel = require('../models/notacreditocompraModel');
 
+const normalizarTipoComprobante = (valor) => {
+  if (valor === null || valor === undefined || valor === '') return valor;
+  return String(valor).trim().padStart(3, '0');
+};
+
 const generarCodigoNotaCredito = async (connection) => {
   const [rows] = await connection.query(
     'SELECT MAX(codigo) AS ultimo FROM nota_credito_compra FOR UPDATE'
@@ -55,6 +60,8 @@ const create = async (data, idPersonal) => {
     throw new Error('Faltan datos obligatorios en la nota de crédito de compra');
   }
 
+  const tipoCmpNormalizado = normalizarTipoComprobante(tipoCmp);
+
   const saldoFinal = typeof saldo === 'number' && !isNaN(saldo) ? saldo : 0;
   const idResponsable = idPersonal || data.id_responsable || null;
 
@@ -72,7 +79,7 @@ const create = async (data, idPersonal) => {
         await notacreditocompraModel.insertNotaCredito(connection, {
           codigoNotaCredito,
           fecha,
-          tipoCmp,
+          tipoCmp: tipoCmpNormalizado,
           codigoletra,
           ptoVta,
           NroCmp,

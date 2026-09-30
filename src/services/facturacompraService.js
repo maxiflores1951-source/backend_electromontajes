@@ -27,6 +27,11 @@ const parseFecha = (valor) => {
     : new Date(valor).getTime();
 };
 
+const normalizarTipoComprobante = (valor) => {
+  if (valor === null || valor === undefined || valor === '') return valor;
+  return String(valor).trim().padStart(3, '0');
+};
+
 const toMysqlFecha = (valor) => {
   if (!valor) return valor;
   const partes = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(valor));
@@ -124,6 +129,8 @@ const create = async (data, idPersonal) => {
     throw new Error('Faltan datos obligatorios en la factura de compra');
   }
 
+  const tipoCmpNormalizado = normalizarTipoComprobante(tipoCmp);
+
   const saldoFinal = typeof saldo === 'number' && !isNaN(saldo) ? saldo : 0;
   const idResponsable = data.id_responsable || null;
   const idCreacion = data.id_creacion || idPersonal || null;
@@ -144,7 +151,7 @@ const create = async (data, idPersonal) => {
         await facturacompraModel.insertFactura(connection, {
           codigoFactura,
           fecha: toMysqlFecha(fecha),
-          tipoCmp,
+          tipoCmp: tipoCmpNormalizado,
           codigoletra,
           ptoVta,
           NroCmp,
