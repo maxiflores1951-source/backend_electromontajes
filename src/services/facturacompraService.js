@@ -490,6 +490,9 @@ const update = async (codigoFactura, data) => {
     if (existeFactura.length === 0) {
       throw new Error('Factura no encontrada');
     }
+    if (Number(existeFactura[0].anulada) === 1) {
+      throw new Error('La factura está anulada, no se puede editar');
+    }
 
     let idServicioFinal = id_servicio;
     let idMovilFinal = id_movil;
@@ -503,10 +506,18 @@ const update = async (codigoFactura, data) => {
     }
 
     const formasPagoFinales = Array.isArray(formasDePago) ? formasDePago : [];
-    const esCuentaCorriente = formasPagoFinales.some((fp) => fp.codigo_valor === 'CC');
+    // Si el body no trae formas de pago, se toman las guardadas para no
+    // perder el caracter de cuenta corriente en ediciones que no las reenvian.
+    const formasActuales = await facturacompraModel.getFormasPagoFactura(codigoFactura);
+    const formasEfectivas = formasPagoFinales.length > 0 ? formasPagoFinales : formasActuales;
+    const esCuentaCorriente = formasEfectivas.some((fp) => fp.codigo_valor === 'CC');
 
-    let saldoFinal = esCuentaCorriente ? (importe || 0) : 0;
-    const pagada = esCuentaCorriente ? 0 : 1;
+    // El saldo nunca se recalcula "a ojo": es importe menos lo ya pagado en
+    // detalle_orden_pago. Editar motivo/obra/etc. no lo mueve.
+    const pagado = await facturacompraModel.getPagadoFactura(connection, codigoFactura);
+    const importeNum = Number(importe) || 0;
+    const saldoFinal = esCuentaCorriente || pagado > 0 ? Math.max(importeNum - pagado, 0) : 0;
+    const pagada = saldoFinal <= 0 ? 1 : 0;
 
     const estadoCalculado = calcularEstadoFactura(item);
     const estadoFinal = estadoCalculado === 'Incompleta' ? (estado || 'Completa') : (estado || estadoCalculado || 'Completa');

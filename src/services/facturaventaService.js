@@ -205,6 +205,8 @@ const update = async (codigo, data) => {
     const facturaAnterior = await facturaventaModel.getByCodigo(codigo);
     const detalleAnterior = await facturaventaModel.getDetalle(codigo);
     const letraAnterior = facturaAnterior?.codigoletra;
+    // Se leen antes de borrar las formas de pago de la transaccion.
+    const formasActuales = await facturaventaModel.getFormasPago(codigo);
 
     if (detalleAnterior && detalleAnterior.length > 0) {
       for (const detalleViejo of detalleAnterior) {
@@ -310,10 +312,13 @@ const update = async (codigo, data) => {
       await facturaventaModel.insertFormasPago(connection, pagosData);
     }
 
-    let saldo = 0;
-    if (formasDePago && formasDePago.some(fp => fp.codigo_valor === 'CC')) {
-      saldo = importe;
-    }
+    // El saldo es importe menos lo ya cobrado en detalle_recibo: editar la
+    // factura sin tocar importe ni cobros no lo mueve.
+    const formasEfectivas = formasDePago && formasDePago.length > 0 ? formasDePago : formasActuales;
+    const esCuentaCorriente = formasEfectivas.some(fp => fp.codigo_valor === 'CC');
+    const pagado = await facturaventaModel.getPagadoFactura(connection, codigo);
+    const importeNum = Number(importe) || 0;
+    const saldo = esCuentaCorriente || pagado > 0 ? Math.max(importeNum - pagado, 0) : 0;
 
     await facturaventaModel.updateSaldo(connection, saldo, codigo);
 

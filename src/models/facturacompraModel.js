@@ -358,8 +358,18 @@ const getFacturasPendientes = async () => {
 };
 
 const existeFactura = async (connection, codigo) => {
-  const [rows] = await connection.query('SELECT codigo FROM factura_compra WHERE codigo = ?', [codigo]);
+  const [rows] = await connection.query('SELECT codigo, anulada FROM factura_compra WHERE codigo = ?', [codigo]);
   return rows;
+};
+
+// Total ya abonado a la factura via ordenes de pago. Es la fuente de verdad
+// del saldo: factura_compra.saldo se va decrementando desde ahi (pagosModel).
+const getPagadoFactura = async (connection, codigo) => {
+  const [rows] = await connection.query(
+    'SELECT COALESCE(SUM(importe), 0) AS pagado FROM detalle_orden_pago WHERE codigo_factura_compra = ?',
+    [codigo]
+  );
+  return Number(rows[0]?.pagado) || 0;
 };
 
 const updateFactura = async (connection, params) => {
@@ -1086,6 +1096,7 @@ module.exports = {
   getFacturasPorServicio,
   getFacturasPendientes,
   existeFactura,
+  getPagadoFactura,
   updateFactura,
   deleteMovimientosFactura,
   deleteOtrosImpuestosFactura,

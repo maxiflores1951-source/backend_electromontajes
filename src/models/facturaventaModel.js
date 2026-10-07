@@ -219,6 +219,16 @@ const updateSaldo = async (connection, saldo, codigo) => {
   await exec(query, [saldo, codigo]);
 };
 
+// Total cobrado via recibos: fuente de verdad del saldo de la factura de venta.
+const getPagadoFactura = async (connection, codigo) => {
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  const [rows] = await exec(
+    'SELECT COALESCE(SUM(pago), 0) AS pagado FROM detalle_recibo WHERE codigo_factura_venta = ?',
+    [codigo]
+  );
+  return Number(rows[0]?.pagado) || 0;
+};
+
 const getAll = async () => {
   const query = `
     SELECT fv.*, 
@@ -514,6 +524,7 @@ module.exports = {
   deleteOtrosImpuestos,
   deleteFormasPago,
   updateSaldo,
+  getPagadoFactura,
   getAll,
   getDetalle,
   getByCodigo,

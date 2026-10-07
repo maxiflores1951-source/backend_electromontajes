@@ -43,7 +43,7 @@ const updateSaldoFactura = async (connection, importeNum, codigo) => {
   const importe = Math.abs(Number(importeNum) || 0);
   const query = `
     UPDATE factura_compra
-    SET saldo = saldo - ?,
+    SET saldo = GREATEST(saldo - ?, 0),
         pagada = IF(saldo <= 0, 1, 0)
     WHERE codigo = ?
   `;
@@ -85,11 +85,11 @@ const restoreSaldoFactura = async (connection, importeNum, codigo) => {
   const importe = Math.abs(Number(importeNum) || 0);
   const query = `
     UPDATE factura_compra
-    SET saldo = saldo + ?,
+    SET saldo = LEAST(saldo + ?, COALESCE(importe, saldo + ?)),
         pagada = IF(saldo > 0, 0, 1)
     WHERE codigo = ?
   `;
-  await connection.query(query, [importe, codigo]);
+  await connection.query(query, [importe, importe, codigo]);
 };
 
 const restoreSaldoNotaCredito = async (connection, importeNum, codigo) => {
