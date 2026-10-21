@@ -24,14 +24,24 @@ const validarDatos = async (data) => {
     for (const item of detalle) {
       const codigo = item.codigo_factura_compra;
       if (!codigo) {
-        throw new Error('El detalle debe incluir codigo_factura_compra');
+        // Detalle sin comprobante (pago a cuenta / anticipo): solo exige importe
+        const importeNum = Number(item.importe) || 0;
+        if (importeNum <= 0) {
+          throw new Error('El detalle sin comprobante debe incluir un importe mayor a cero');
+        }
+        continue;
       }
       if (codigosVistos.has(codigo)) {
         throw new Error(`La factura ${codigo} está duplicada en el detalle`);
       }
       codigosVistos.add(codigo);
       const esNotaCredito = codigo.startsWith('NCC');
-      const table = esNotaCredito ? 'nota_credito_compra' : 'factura_compra';
+      const esNotaDebito = codigo.startsWith('NDB');
+      const table = esNotaCredito
+        ? 'nota_credito_compra'
+        : esNotaDebito
+          ? 'nota_debito_compra'
+          : 'factura_compra';
       const [rows] = await db.query(`SELECT 1 FROM ${table} WHERE codigo = ?`, [codigo]);
       if (rows.length === 0) {
         throw new Error(`El código ${codigo} no existe en ${table}`);
@@ -114,19 +124,37 @@ const create = async (data, idUsuario) => {
 
     if (Array.isArray(detalle) && detalle.length > 0) {
       for (const item of detalle) {
-        const codigo = item.codigo_factura_compra;
-        const importeNum = Number(item.importe);
+        const codigo = item.codigo_factura_compra ?? null;
+        const importeNum = Number(item.importe) || 0;
+        const descripcion = item.descripcion || null;
+
+        if (!codigo) {
+          // Detalle sin comprobante: se guarda la fila sin imputar factura/NCC/NDC
+          await pagosModel.insertDetalleOrdenPago(connection, [
+            codigoOrdenPago,
+            null,
+            null,
+            descripcion,
+            importeNum,
+          ]);
+          continue;
+        }
+
         const esNotaCredito = codigo.startsWith('NCC');
+        const esNotaDebito = codigo.startsWith('NDB');
 
         await pagosModel.insertDetalleOrdenPago(connection, [
           codigoOrdenPago,
-          esNotaCredito ? null : codigo,
+          esNotaCredito || esNotaDebito ? null : codigo,
           esNotaCredito ? codigo : null,
+          descripcion,
           importeNum,
         ]);
 
         if (esNotaCredito) {
           await pagosModel.updateSaldoNotaCredito(connection, importeNum, codigo);
+        } else if (esNotaDebito) {
+          await pagosModel.updateSaldoNotaDebito(connection, importeNum, codigo);
         } else {
           await pagosModel.updateSaldoFactura(connection, importeNum, codigo);
         }
@@ -223,19 +251,36 @@ const update = async (codigo, data, idUsuario) => {
 
     if (Array.isArray(detalle) && detalle.length > 0) {
       for (const item of detalle) {
-        const detCodigo = item.codigo_factura_compra;
+        const detCodigo = item.codigo_factura_compra ?? null;
         const importeNum = Number(item.importe) || 0;
+        const descripcion = item.descripcion || null;
+
+        if (!detCodigo) {
+          await pagosModel.insertDetalleOrdenPago(connection, [
+            codigo,
+            null,
+            null,
+            descripcion,
+            importeNum,
+          ]);
+          continue;
+        }
+
         const esNotaCredito = detCodigo.startsWith('NCC');
+        const esNotaDebito = detCodigo.startsWith('NDB');
 
         await pagosModel.insertDetalleOrdenPago(connection, [
           codigo,
-          esNotaCredito ? null : detCodigo,
+          esNotaCredito || esNotaDebito ? null : detCodigo,
           esNotaCredito ? detCodigo : null,
+          descripcion,
           importeNum,
         ]);
 
         if (esNotaCredito) {
           await pagosModel.updateSaldoNotaCredito(connection, importeNum, detCodigo);
+        } else if (esNotaDebito) {
+          await pagosModel.updateSaldoNotaDebito(connection, importeNum, detCodigo);
         } else {
           await pagosModel.updateSaldoFactura(connection, importeNum, detCodigo);
         }
@@ -277,8 +322,9 @@ const getAll = async () => {
     const ordenesPago = await pagosModel.getOrdenesPago(connection);
 
     for (const ordenPago of ordenesPago) {
-      ordenPago.facturas_compra = await pagosModel.getFacturasByOrdenPago(connection, ordenPago.codigo);
-      ordenPago.notas_credito_compra = await pagosModel.getNotasCreditoByOrdenPago(connection, ordenPago.codigo);
+ordenPago.facturas_compra = await pagosModel.getFacturasByOrdenPago(connection, ordenPago.codigo);
+    ordenPago.notas_credito_compra = await pagosModel.getNotasCreditoByOrdenPago(connection, ordenPago.codigo);
+    ordenPago.sin_comprobantes = await pagosModel.getSinComprobantesByOrdenPago(connection, ordenPago.codigo);
       ordenPago.otros_impuestos = await pagosModel.getImpuestosByOrdenPago(connection, ordenPago.codigo);
       ordenPago.formas_pago = await pagosModel.getFormasPagoByOrdenPago(connection, ordenPago.codigo);
     }
@@ -297,11 +343,13 @@ const getByProveedor = async (idProveedor, idRazonSocial) => {
       const facturas = await pagosModel.getFacturasByPago(pago.codigo);
       const impuestos = await pagosModel.getImpuestosByPago(pago.codigo);
       const formasPago = await pagosModel.getFormasPagoByPago(pago.codigo);
+      const sinComprobantes = await pagosModel.getSinComprobantesByPago(pago.codigo);
       return {
         ...pago,
         facturas,
         impuestos,
         formasPago,
+        sin_comprobantes: sinComprobantes,
       };
     })
   );

@@ -22,8 +22,9 @@ const insertDetalleOrdenPago = async (connection, values) => {
       codigo_orden_pago,
       codigo_factura_compra,
       codigo_notacredito_compra,
+      descripcion,
       importe
-    ) VALUES (?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?)
   `;
   await connection.query(query, values);
 };
@@ -103,6 +104,17 @@ const restoreSaldoNotaCredito = async (connection, importeNum, codigo) => {
   await connection.query(query, [importe, codigo]);
 };
 
+const restoreSaldoNotaDebito = async (connection, importeNum, codigo) => {
+  const importe = Math.abs(Number(importeNum) || 0);
+  const query = `
+    UPDATE nota_debito_compra
+    SET saldo = saldo + ?,
+        pagada = IF(saldo > 0, 0, 1)
+    WHERE codigo = ?
+  `;
+  await connection.query(query, [importe, codigo]);
+};
+
 const borrarDetalleOrdenPago = async (connection, codigoOrdenPago) => {
   await connection.query('DELETE FROM detalle_orden_pago WHERE codigo_orden_pago = ?', [codigoOrdenPago]);
 };
@@ -172,12 +184,15 @@ const getFacturasByOrdenPago = async (connection, codigoOrdenPago) => {
     FROM detalle_orden_pago dop
     JOIN factura_compra fc 
       ON fc.codigo = dop.codigo_factura_compra
-    JOIN tipocomprobante tc 
-      ON fc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(fc.tipoCmp, 3, '0') = tc.codigo
     WHERE dop.codigo_orden_pago = ?
   `;
   const [rows] = await connection.query(query, [codigoOrdenPago]);
-  return rows;
+  return rows.map((row) =>
+    row.tipoCmp === null || row.tipoCmp === undefined
+      ? row
+      : { ...row, tipoCmp: String(row.tipoCmp).trim().padStart(3, '0') }
+  );
 };
 
 const getNotasCreditoByOrdenPago = async (connection, codigoOrdenPago) => {
@@ -198,12 +213,19 @@ const getNotasCreditoByOrdenPago = async (connection, codigoOrdenPago) => {
     FROM detalle_orden_pago dop
     JOIN nota_credito_compra nc 
       ON nc.codigo = dop.codigo_notacredito_compra
-    JOIN tipocomprobante tc 
-      ON nc.tipoCmp = tc.codigo
+    LEFT JOIN tipocomprobante tc ON LPAD(nc.tipoCmp, 3, '0') = tc.codigo
     WHERE dop.codigo_orden_pago = ?
   `;
   const [rows] = await connection.query(query, [codigoOrdenPago]);
-  return rows;
+  return rows.map((row) =>
+    row.tipoCmp === null || row.tipoCmp === undefined
+      ? row
+      : { ...row, tipoCmp: String(row.tipoCmp).trim().padStart(3, '0') }
+  );
+};
+
+const getNotasDebitoByOrdenPago = async (connection, codigoOrdenPago) => {
+  return [];
 };
 
 const getImpuestosByOrdenPago = async (connection, codigoOrdenPago) => {
@@ -323,6 +345,36 @@ const getFormasPagoByPago = async (codigo) => {
   return rows;
 };
 
+const getSinComprobantesByOrdenPago = async (connection, codigoOrdenPago) => {
+  const query = `
+    SELECT
+      dop.id,
+      dop.descripcion,
+      dop.importe
+    FROM detalle_orden_pago dop
+    WHERE dop.codigo_orden_pago = ?
+      AND dop.codigo_factura_compra IS NULL
+      AND dop.codigo_notacredito_compra IS NULL
+  `;
+  const [rows] = await connection.query(query, [codigoOrdenPago]);
+  return rows;
+};
+
+const getSinComprobantesByPago = async (codigo) => {
+  const query = `
+    SELECT
+      dop.id,
+      dop.descripcion,
+      dop.importe
+    FROM detalle_orden_pago dop
+    WHERE dop.codigo_orden_pago = ?
+      AND dop.codigo_factura_compra IS NULL
+      AND dop.codigo_notacredito_compra IS NULL
+  `;
+  const [rows] = await db.query(query, [codigo]);
+  return rows;
+};
+
 module.exports = {
   getLastCodigo,
   insertOrdenPago,
@@ -334,6 +386,7 @@ module.exports = {
   getDetalleOrdenPago,
   restoreSaldoFactura,
   restoreSaldoNotaCredito,
+  restoreSaldoNotaDebito,
   borrarDetalleOrdenPago,
   borrarOtrosImpuestosOrdenPago,
   borrarFormasPagoOrdenPago,
@@ -343,8 +396,11 @@ module.exports = {
   getNotasCreditoByOrdenPago,
   getImpuestosByOrdenPago,
   getFormasPagoByOrdenPago,
+  getSinComprobantesByOrdenPago,
   getOrdenesPagoByProveedor,
   getFacturasByPago,
   getImpuestosByPago,
   getFormasPagoByPago,
+  getSinComprobantesByPago,
+  getNotasDebitoByOrdenPago,
 };

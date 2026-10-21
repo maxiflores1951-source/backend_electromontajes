@@ -1017,22 +1017,36 @@ const getSaldosPorProveedor = async (idRazonSocial) => {
       p.Nombre_Prov AS nombre_proveedor,
       p.Razon_Social AS razon_social_proveedor,
       p.Cuilt AS cuit_proveedor,
-      SUM(fc.saldo) AS monto_total
-    FROM factura_compra fc
-    JOIN proveedor p ON fc.id_proveedor = p.Cod_Proveedor
-    JOIN razones_sociales rs ON fc.id_razonsocial = rs.id
-    WHERE fc.anulada = 0
-      AND fc.saldo > 0
-      AND fc.id_razonsocial = ?
-      AND EXISTS (
-        SELECT 1
-        FROM formas_pago_factura_compra fpf
-        WHERE fpf.codigo_factura_compra = fc.codigo
-          AND fpf.codigo_valor = 'CC'
-      )
+      SUM(CASE WHEN mov.tipo = 'factura' THEN mov.saldo ELSE -mov.saldo END) AS monto_total
+    FROM (
+      SELECT 'factura' AS tipo, fc.id_proveedor AS id_proveedor, fc.saldo AS saldo
+      FROM factura_compra fc
+      WHERE fc.anulada = 0
+        AND fc.saldo > 0
+        AND fc.id_razonsocial = ?
+        AND EXISTS (
+          SELECT 1
+          FROM formas_pago_factura_compra fpf
+          WHERE fpf.codigo_factura_compra = fc.codigo
+            AND fpf.codigo_valor = 'CC'
+        )
+      UNION ALL
+      SELECT 'nota' AS tipo, ncc.id_proveedor AS id_proveedor, ncc.saldo AS saldo
+      FROM nota_credito_compra ncc
+      WHERE ncc.anulada = 0
+        AND ncc.saldo > 0
+        AND ncc.id_razonsocial = ?
+        AND EXISTS (
+          SELECT 1
+          FROM formas_pago_nota_credito_compra fpnc
+          WHERE fpnc.codigo_nota_credito_compra = ncc.codigo
+            AND fpnc.codigo_valor = 'CC'
+        )
+    ) mov
+    JOIN proveedor p ON p.Cod_Proveedor = mov.id_proveedor
     GROUP BY p.Cod_Proveedor, p.Nombre_Prov, p.Razon_Social, p.Cuilt
     ORDER BY monto_total DESC
-  `, [idRazonSocial]);
+  `, [idRazonSocial, idRazonSocial]);
   return rows;
 };
 
