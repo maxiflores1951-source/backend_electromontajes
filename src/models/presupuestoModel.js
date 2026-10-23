@@ -150,7 +150,6 @@ const getPresupuestosActivos = async (id_cliente) => {
     LEFT JOIN servicios s ON p.id_servicio = s.IDOBRA
     WHERE  ( p.saldo_iva <> 0 OR p.saldo_sin_iva <> 0)
       AND p.estado = 1
-      AND p.id_servicio IS NOT NULL
   `;
 
   const values = [];
