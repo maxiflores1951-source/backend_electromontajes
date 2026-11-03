@@ -152,7 +152,8 @@ const getArticulosByDevolucion = async (codigo) => {
     SELECT mdv.*, 
            a.Nombre_Art AS nombre_articulo,
            a.Unidad,
-           (mdv.cantidad * mdv.precio) AS importe_calculado
+           (mdv.cantidad * mdv.precio) AS importe_calculado,
+           mdv.precio AS precio
     FROM movimientos_devolucion_ventas mdv
     LEFT JOIN articulo a ON TRIM(mdv.id_articulo) = TRIM(a.Cod_Articulo)
     WHERE mdv.codigo_devolucion_venta = ?

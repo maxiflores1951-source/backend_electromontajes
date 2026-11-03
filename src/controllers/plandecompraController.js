@@ -10,6 +10,36 @@ const getAll = async (req, res) => {
   }
 };
 
+const create = async (req, res) => {
+  try {
+    const result = await plandecompraService.create(req.body);
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const update = async (req, res) => {
+  try {
+    const result = await plandecompraService.update(req.params.id, req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const remove = async (req, res) => {
+  try {
+    const result = await plandecompraService.remove(req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   getAll,
+  create,
+  update,
+  remove,
 };

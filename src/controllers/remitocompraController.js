@@ -2,7 +2,7 @@ const remitocompraService = require('../services/remitocompraService');
 
 const create = async (req, res) => {
   try {
-    const resultado = await remitocompraService.create(req.body);
+    const resultado = await remitocompraService.create(req.body, req.idPersonal);
     if (resultado.existe) {
       return res.status(200).json({
         message: 'El código ya existe, no se insertará un nuevo registro',
@@ -69,7 +69,7 @@ const getResumen = async (req, res) => {
 const update = async (req, res) => {
   const { codigo } = req.params;
   try {
-    await remitocompraService.update(codigo, req.body);
+    await remitocompraService.update(codigo, req.body, req.idPersonal);
     res.status(200).json({
       message: 'Remito de compra, movimientos y relaciones actualizados con éxito',
       codigo

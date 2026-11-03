@@ -18,13 +18,14 @@ const insert = async (connection, data) => {
     importe,
     observacion,
     NroCmp,
+    id_creado,
   } = data;
 
   const query = `
     INSERT INTO recibo (
       codigo, fecha, periodo_iva, moneda, ctz, id_cliente, id_razonsocial,
-      importe, observacion, fecha_creacion, NroCmp
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(), ?)
+      importe, observacion, fecha_creacion, NroCmp, id_creado
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(), ?, ?)
   `;
 
   const values = [
@@ -38,6 +39,7 @@ const insert = async (connection, data) => {
     importe,
     observacion || null,
     NroCmp,
+    id_creado || null,
   ];
 
   const exec = connection ? connection.query.bind(connection) : db.query;
@@ -124,6 +126,11 @@ const getRecibos = async (connection) => {
       r.observacion,
       r.NroCmp,
       r.fecha_creacion,
+      r.id_creado,
+      r.id_modificado,
+      r.fecha_modificacion,
+      pc.NOMBRE AS creado_por,
+      pm.NOMBRE AS modificado_por,
 
       mon.nombre AS nombre_moneda,
       
@@ -142,6 +149,8 @@ const getRecibos = async (connection) => {
     JOIN razones_sociales rs ON rs.id = r.id_razonsocial
     JOIN moneda mon ON r.moneda = mon.codigo
     JOIN datos_empresa de ON de.id = r.id_razonsocial
+    LEFT JOIN personal pc ON pc.ID = r.id_creado
+    LEFT JOIN personal pm ON pm.ID = r.id_modificado
     ORDER BY r.fecha_creacion DESC
   `;
   const exec = connection ? connection.query.bind(connection) : db.query;
@@ -175,6 +184,11 @@ const getRecibosFiltrados = async (connection, desdeCompleto, hastaCompleto) => 
       r.observacion,
       r.NroCmp,
       r.fecha_creacion,
+      r.id_creado,
+      r.id_modificado,
+      r.fecha_modificacion,
+      pc.NOMBRE AS creado_por,
+      pm.NOMBRE AS modificado_por,
 
       mon.nombre AS nombre_moneda,
       
@@ -193,6 +207,8 @@ const getRecibosFiltrados = async (connection, desdeCompleto, hastaCompleto) => 
     JOIN razones_sociales rs ON rs.id = r.id_razonsocial
     JOIN moneda mon ON r.moneda = mon.codigo
     JOIN datos_empresa de ON de.id = r.id_razonsocial
+    LEFT JOIN personal pc ON pc.ID = r.id_creado
+    LEFT JOIN personal pm ON pm.ID = r.id_modificado
     WHERE r.fecha BETWEEN ? AND ?
     ORDER BY r.fecha_creacion DESC
   `;

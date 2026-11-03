@@ -2,7 +2,7 @@ const reciboService = require('../services/reciboService');
 
 const create = async (req, res) => {
   try {
-    const codigo = await reciboService.create(req.body);
+    const codigo = await reciboService.create(req.body, req.idPersonal);
     res.status(201).json({ mensaje: 'Recibo creado exitosamente', codigo });
   } catch (err) {
     if (err.message.includes('Faltan datos obligatorios')) {

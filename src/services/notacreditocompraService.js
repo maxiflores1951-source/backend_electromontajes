@@ -101,7 +101,8 @@ const create = async (data, idPersonal) => {
           observacion,
           estado: 'Completa',
           saldoFinal,
-          id_factura_compra
+          id_factura_compra,
+          id_creado: idPersonal || data.id_creado || null
         });
         break;
       } catch (err) {

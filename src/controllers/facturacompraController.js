@@ -84,7 +84,7 @@ const getFacturasPendientes = async (req, res) => {
 const update = async (req, res) => {
   const codigoFactura = req.params.codigo;
   try {
-    const { codigoFactura: codigo, saldoFinal } = await facturacompraService.update(codigoFactura, req.body);
+    const { codigoFactura: codigo, saldoFinal } = await facturacompraService.update(codigoFactura, req.body, req.idPersonal);
     res.status(200).json({ mensaje: 'Factura actualizada correctamente', codigoFactura: codigo, saldoFinal });
   } catch (error) {
     if (error.message.includes('no encontrada')) {

@@ -133,7 +133,8 @@ const create = async (data, idPersonal) => {
 
   const saldoFinal = typeof saldo === 'number' && !isNaN(saldo) ? saldo : 0;
   const idResponsable = data.id_responsable || null;
-  const idCreacion = data.id_creacion || idPersonal || null;
+  const idCreacion = data.id_creacion || data.id_creado || idPersonal || null;
+  const fechaCreacion = new Date();
   const estadoCalculado = calcularEstadoFactura(item);
   const estadoFinal = estadoCalculado === 'Incompleta' ? (estado || 'Completa') : (estado || estadoCalculado || 'Completa');
 
@@ -172,7 +173,9 @@ const create = async (data, idPersonal) => {
           importe,
           observacion,
           estado: estadoFinal,
-          saldoFinal
+          saldoFinal,
+          id_creado: idCreacion,
+          fecha_creacion: fechaCreacion
         });
         break;
       } catch (err) {
@@ -451,7 +454,7 @@ const getFacturasPendientes = async () => {
   return facturasCompletas;
 };
 
-const update = async (codigoFactura, data) => {
+const update = async (codigoFactura, data, idPersonal) => {
   const {
     fecha,
     tipoCmp,
@@ -521,6 +524,8 @@ const update = async (codigoFactura, data) => {
 
     const estadoCalculado = calcularEstadoFactura(item);
     const estadoFinal = estadoCalculado === 'Incompleta' ? (estado || 'Completa') : (estado || estadoCalculado || 'Completa');
+    const idModificacion = idPersonal || null;
+    const fechaModificacion = new Date();
 
     await facturacompraModel.updateFactura(connection, {
       codigoFactura,
@@ -547,7 +552,9 @@ const update = async (codigoFactura, data) => {
       observacion,
       estado: estadoFinal,
       pagada,
-      saldoFinal
+      saldoFinal,
+      id_modificado: idModificacion,
+      fecha_modificacion: fechaModificacion
     });
 
     await facturacompraModel.deleteMovimientosFactura(connection, codigoFactura);

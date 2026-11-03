@@ -16,7 +16,8 @@ const insertNotaCredito = async (connection, params) => {
     codigoNotaCredito, fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz,
     id_proveedor, id_plancompra, id_motivo, id_servicio, id_movil,
     id_responsable, id_razonsocial, totalIVA21, totalIVA27, totalIVA10,
-    bonificacion, periodoiva, importe, observacion, estado, saldoFinal, id_factura_compra
+    bonificacion, periodoiva, importe, observacion, estado, saldoFinal, id_factura_compra,
+    id_creado
   } = params;
 
   const query = `
@@ -25,8 +26,8 @@ const insertNotaCredito = async (connection, params) => {
       id_proveedor, id_plancompra, id_motivo, id_servicio, id_movil,
       id_responsable, id_razonsocial, totalIVA21, totalIVA27, totalIVA10,
       bonificacion, periodoiva, importe, observacion, anulada, estado, saldo,
-      id_factura_compra
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`;
+      id_factura_compra, id_creado
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`;
 
   const values = [
     codigoNotaCredito, fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz || 1,
@@ -38,7 +39,8 @@ const insertNotaCredito = async (connection, params) => {
     importe, observacion || null,
     estado || 'Completa',
     saldoFinal,
-    id_factura_compra || null
+    id_factura_compra || null,
+    id_creado || null
   ];
 
   await connection.query(query, values);
@@ -99,7 +101,9 @@ const getNotasCredito = async () => {
            mv.kilometraje AS kilometraje_movil,
            fc.codigo AS factura_relacionada_codigo,
            fc.fecha AS factura_fecha,
-           fc.NroCmp AS factura_nro_comprobante
+           fc.NroCmp AS factura_nro_comprobante,
+           pc.NOMBRE AS creado_por,
+           pm.NOMBRE AS modificado_por
     FROM nota_credito_compra ncc
     LEFT JOIN proveedor p ON ncc.id_proveedor = p.Cod_Proveedor
     LEFT JOIN motivos m ON ncc.id_motivo = m.codigo
@@ -110,6 +114,8 @@ const getNotasCredito = async () => {
     LEFT JOIN servicios s ON ncc.id_servicio = s.IDOBRA
     LEFT JOIN moviles mv ON ncc.id_movil = mv.nro_ident
     LEFT JOIN factura_compra fc ON ncc.id_factura_compra = fc.codigo
+    LEFT JOIN personal pc ON pc.ID = ncc.id_creado
+    LEFT JOIN personal pm ON pm.ID = ncc.id_modificado
     WHERE ncc.anulada = 0
     ORDER BY ncc.codigo DESC
   `);

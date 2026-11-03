@@ -15,9 +15,9 @@ const insertCaja = async (connection, values) => {
     INSERT INTO caja (
       codigo, fecha_pedido, id_solicitado, id_motivo,
       id_servicio, id_movil, operacion, observacion, importe,
-      estado, plazo_rendicion
+      estado, plazo_rendicion, id_creado
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   await connection.query(query, values);
 };
@@ -42,11 +42,15 @@ const getCajas = async () => {
       c.*, 
       p.NOMBRE AS nombre_solicitante,
       m.nombre AS nombre_motivo,
-      s.OBRA AS nombre_obra
+      s.OBRA AS nombre_obra,
+      pc.NOMBRE AS creado_por,
+      pm.NOMBRE AS modificado_por
     FROM caja c
     LEFT JOIN personal p ON c.id_solicitado = p.ID
     LEFT JOIN motivos m ON c.id_motivo = m.codigo
     LEFT JOIN servicios s ON c.id_servicio = s.IDOBRA
+    LEFT JOIN personal pc ON pc.ID = c.id_creado
+    LEFT JOIN personal pm ON pm.ID = c.id_modificado
     ORDER BY c.codigo DESC
   `;
   const [rows] = await db.query(query);
@@ -158,7 +162,7 @@ const deleteCajaFactura = async (codigoCaja, codigoFactura) => {
 };
 
 const rendirCaja = async (values) => {
-  const query = 'UPDATE caja SET saldo = ?, estado = ? WHERE codigo = ?';
+  const query = 'UPDATE caja SET saldo = ?, estado = ?, id_modificado = ?, fecha_modificacion = NOW() WHERE codigo = ?';
   await db.query(query, values);
 };
 
@@ -180,7 +184,9 @@ const updateCaja = async (values) => {
       importe = ?,
       saldo = ?,
       estado = ?,
-      plazo_rendicion = ?
+      plazo_rendicion = ?,
+      id_modificado = ?,
+      fecha_modificacion = NOW()
     WHERE codigo = ?
   `;
   await db.query(query, values);

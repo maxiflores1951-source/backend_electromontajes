@@ -108,7 +108,8 @@ const getArticulosByRemito = async (codigo) => {
     SELECT mrv.*, 
            a.Nombre_Art AS nombre_articulo,
            a.Unidad,
-           (mrv.cantidad * mrv.precio) AS importe_calculado
+           (mrv.cantidad * mrv.precio) AS importe_calculado,
+           mrv.precio AS precio
     FROM movimientos_remito_ventas mrv
     LEFT JOIN articulo a ON mrv.id_articulo = a.Cod_Articulo
     WHERE mrv.codigo_remito_venta = ?

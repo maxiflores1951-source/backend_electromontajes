@@ -18,7 +18,37 @@ const getExceptoCodigo1 = async (req, res) => {
   }
 };
 
+const create = async (req, res) => {
+  try {
+    const result = await valoresService.create(req.body);
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const update = async (req, res) => {
+  try {
+    const result = await valoresService.update(req.params.id, req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const remove = async (req, res) => {
+  try {
+    const result = await valoresService.remove(req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   getAll,
   getExceptoCodigo1,
+  create,
+  update,
+  remove,
 };

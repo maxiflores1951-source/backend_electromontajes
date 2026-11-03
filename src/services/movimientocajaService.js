@@ -38,7 +38,7 @@ const toSqlDate = (valor) => {
   return valor;
 };
 
-const create = async (data) => {
+const create = async (data, idPersonal) => {
   const {
     fecha_pedido,
     id_solicitado,
@@ -51,6 +51,7 @@ const create = async (data) => {
     importe,
     formasDePago,
     plazo_rendicion,
+    id_creado,
   } = data;
 
   if (!fecha_pedido || !id_solicitado || !id_motivo) {
@@ -89,6 +90,7 @@ const create = async (data) => {
           importe || 0,
           estado,
           plazo_rendicion ? 1 : 0,
+          idPersonal || id_creado || null,
         ]);
         break;
       } catch (err) {
@@ -202,17 +204,17 @@ const deleteCajaFactura = async (data) => {
   await movimientocajaModel.deleteCajaFactura(codigo_caja, codigo_factura);
 };
 
-const rendirCaja = async (data) => {
+const rendirCaja = async (data, idPersonal) => {
   const { codigo_caja, saldo, estado } = data;
 
   if (!codigo_caja || saldo === undefined || estado === undefined) {
     throw new Error('Faltan datos obligatorios: codigo_caja, saldo, estado');
   }
 
-  await movimientocajaModel.rendirCaja([saldo, estado, codigo_caja]);
+  await movimientocajaModel.rendirCaja([saldo, estado, idPersonal || null, codigo_caja]);
 };
 
-const updateCaja = async (codigoCaja, data) => {
+const updateCaja = async (codigoCaja, data, idPersonal) => {
   const {
     fecha_pedido,
     id_solicitado,
@@ -259,6 +261,7 @@ const updateCaja = async (codigoCaja, data) => {
     nuevoSaldo,
     estadoNuevo,
     plazo_rendicion ? 1 : 0,
+    idPersonal || null,
     codigoCaja,
   ]);
 

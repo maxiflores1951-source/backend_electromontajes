@@ -56,7 +56,12 @@ const insertarRemitoVenta = async (data) => {
     let codigoFactura = null;
     let codigoNotaCredito = null;
 
-    if (articulo.codigo_documento) {
+    // Prioridad 1: codigo_factura_compra directo (nuevo formato)
+    if (articulo.codigo_factura_compra) {
+      codigoFactura = articulo.codigo_factura_compra;
+    }
+    // Prioridad 2: codigo_documento (formato legacy: 'FC...' o 'NCC...')
+    else if (articulo.codigo_documento) {
       if (articulo.codigo_documento.startsWith('NCC')) {
         codigoNotaCredito = articulo.codigo_documento;
       } else if (articulo.codigo_documento.startsWith('FC')) {

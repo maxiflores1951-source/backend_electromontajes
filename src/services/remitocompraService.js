@@ -71,7 +71,8 @@ const create = async (data = {}, idUsuario) => {
       id_movil,
       activo,
       id_razon_social,
-      observacion
+      observacion,
+      id_creado: idUsuario || data.id_creado || null
     });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
@@ -87,7 +88,8 @@ const create = async (data = {}, idUsuario) => {
         id_movil,
         activo,
         id_razon_social,
-        observacion
+        observacion,
+        id_creado: idUsuario || data.id_creado || null
       });
     } else {
       throw err;
@@ -214,7 +216,7 @@ const getResumen = async () => {
   return { resumen, remitos_por_motivo: remitosPorMotivo };
 };
 
-const update = async (codigo, data) => {
+const update = async (codigo, data, idUsuario) => {
   const {
     fecha_entrega,
     remito,
@@ -251,7 +253,8 @@ const update = async (codigo, data) => {
     id_movil,
     activo,
     id_razon_social,
-    observacion
+    observacion,
+    id_modificado: idUsuario || data.id_modificado || null
   });
 
   const movimientosViejos = await remitocompraModel.getMovimientosRemito(codigo);
@@ -279,7 +282,7 @@ const update = async (codigo, data) => {
             nombre: it.nombre,
             unidad: it.unidad,
             cantidad: it.cantidad,
-          });
+          }, idUsuario);
           varianteIds[i] = { index: i, varianteId };
         } catch (err) {
           console.error('Error upserting EPP variante for item', i, err.message);

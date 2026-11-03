@@ -13,13 +13,14 @@ const getRemitoByCodigo = async (codigo) => {
 const insertRemito = async (params) => {
   const {
     codigoOrden, remito, fecha_entrega, id_solicitado, id_proveedor,
-    id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion
+    id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion,
+    id_creado
   } = params;
 
   const query = `
     INSERT INTO remito_compra
-    (codigo, remito, fecha_entrega, id_solicitado, id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    (codigo, remito, fecha_entrega, id_solicitado, id_proveedor, id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion, id_creado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   await db.query(query, [
     codigoOrden,
@@ -32,7 +33,8 @@ const insertRemito = async (params) => {
     id_movil || null,
     activo,
     id_razon_social,
-    observacion
+    observacion,
+    id_creado || null
   ]);
 };
 
@@ -64,7 +66,9 @@ const getRemitosCompra = async () => {
            rs.razon_social,
            rs.cuil,
            s.OBRA AS nombre_obra,
-           rf.factura AS factura_asociada
+           rf.factura AS factura_asociada,
+           pc.NOMBRE AS creado_por,
+           pm.NOMBRE AS modificado_por
     FROM remito_compra rc
     JOIN proveedor p ON rc.id_proveedor = p.Cod_Proveedor
     LEFT JOIN motivos m ON rc.id_motivo = m.codigo
@@ -72,6 +76,8 @@ const getRemitosCompra = async () => {
     LEFT JOIN razones_sociales rs ON rc.id_razon_social = rs.id
     LEFT JOIN servicios s ON rc.id_servicio = s.IDOBRA
     LEFT JOIN remito_factura rf ON rc.codigo = rf.remito
+    LEFT JOIN personal pc ON pc.ID = rc.id_creado
+    LEFT JOIN personal pm ON pm.ID = rc.id_modificado
     ORDER BY rc.codigo DESC;
   `);
   return rows;
@@ -127,10 +133,14 @@ const getRemitosPorServicio = async (idServicio) => {
        rc.*,
        p.Nombre_Prov AS nombre_proveedor,
            p.Cuilt AS cuil_proveedor,
-       s.OBRA AS nombre_obra
+       s.OBRA AS nombre_obra,
+       pc.NOMBRE AS creado_por,
+       pm.NOMBRE AS modificado_por
      FROM remito_compra rc
      JOIN proveedor p ON rc.id_proveedor = p.Cod_Proveedor
      JOIN servicios s ON rc.id_servicio = s.IDOBRA
+     LEFT JOIN personal pc ON pc.ID = rc.id_creado
+     LEFT JOIN personal pm ON pm.ID = rc.id_modificado
      WHERE rc.id_servicio = ?
      ORDER BY rc.id_proveedor
   `, [idServicio]);
@@ -147,7 +157,9 @@ const getRemitosSinOrden = async () => {
            rs.razon_social,
            rs.cuil,
            s.OBRA AS nombre_obra,
-           rf.factura AS factura_asociada
+           rf.factura AS factura_asociada,
+           pc.NOMBRE AS creado_por,
+           pm.NOMBRE AS modificado_por
     FROM remito_compra rc
     JOIN proveedor p ON rc.id_proveedor = p.Cod_Proveedor
     LEFT JOIN motivos m ON rc.id_motivo = m.codigo
@@ -155,6 +167,8 @@ const getRemitosSinOrden = async () => {
     LEFT JOIN razones_sociales rs ON rc.id_razon_social = rs.id
     LEFT JOIN servicios s ON rc.id_servicio = s.IDOBRA
     LEFT JOIN remito_factura rf ON rc.codigo = rf.remito
+    LEFT JOIN personal pc ON pc.ID = rc.id_creado
+    LEFT JOIN personal pm ON pm.ID = rc.id_modificado
     WHERE rc.codigo NOT IN (
       SELECT remito
       FROM remito_orden
@@ -212,14 +226,16 @@ const getRemitosPorMotivo = async () => {
 const updateRemito = async (params) => {
   const {
     codigo, remito, fecha_entrega, id_solicitado, id_proveedor,
-    id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion
+    id_motivo, id_servicio, id_movil, activo, id_razon_social, observacion,
+    id_modificado
   } = params;
 
   const query = `
     UPDATE remito_compra
     SET remito = ?, fecha_entrega = ?, id_solicitado = ?, id_proveedor = ?,
         id_motivo = ?, id_servicio = ?, id_movil = ?, activo = ?,
-        id_razon_social = ?, observacion = ?
+        id_razon_social = ?, observacion = ?, id_modificado = ?,
+        fecha_modificacion = NOW()
     WHERE codigo = ?`;
 
   await db.query(query, [
@@ -233,6 +249,7 @@ const updateRemito = async (params) => {
     activo,
     id_razon_social,
     observacion,
+    id_modificado || null,
     codigo
   ]);
 };
@@ -258,13 +275,17 @@ const getRemitosSinFactura = async () => {
            ps.NOMBRE AS nombre_solicitado,
            rs.razon_social,
            rs.cuil,
-           s.OBRA AS nombre_obra
+           s.OBRA AS nombre_obra,
+           pc.NOMBRE AS creado_por,
+           pm.NOMBRE AS modificado_por
     FROM remito_compra rc
     JOIN proveedor p ON rc.id_proveedor = p.Cod_Proveedor
     LEFT JOIN motivos m ON rc.id_motivo = m.codigo
     LEFT JOIN personal ps ON rc.id_solicitado = ps.ID
     LEFT JOIN razones_sociales rs ON rc.id_razon_social = rs.id
     LEFT JOIN servicios s ON rc.id_servicio = s.IDOBRA
+    LEFT JOIN personal pc ON pc.ID = rc.id_creado
+    LEFT JOIN personal pm ON pm.ID = rc.id_modificado
     WHERE rc.codigo NOT IN (
       SELECT remito
       FROM remito_factura

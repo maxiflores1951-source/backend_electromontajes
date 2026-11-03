@@ -2,7 +2,7 @@ const movimientocajaService = require('../services/movimientocajaService');
 
 const create = async (req, res) => {
   try {
-    const codigoCaja = await movimientocajaService.create(req.body);
+    const codigoCaja = await movimientocajaService.create(req.body, req.idPersonal);
     res.status(201).json({ message: 'Caja, movimientos y formas de pago registrados con éxito', codigoCaja });
   } catch (error) {
     if (error.message.includes('Faltan datos obligatorios en la caja.') || error.message.includes('El código generado ya existe')) {
@@ -97,7 +97,7 @@ const deleteCajaFactura = async (req, res) => {
 const rendirCaja = async (req, res) => {
   try {
     const { codigo_caja, saldo, estado } = req.body;
-    await movimientocajaService.rendirCaja(req.body);
+    await movimientocajaService.rendirCaja(req.body, req.idPersonal);
     res.json({ message: 'Caja rendida correctamente', codigo_caja, saldo, estado });
   } catch (error) {
     if (error.message.includes('Faltan datos obligatorios: codigo_caja, saldo, estado')) {
@@ -111,7 +111,7 @@ const rendirCaja = async (req, res) => {
 const updateCaja = async (req, res) => {
   try {
     const codigoCaja = req.params.codigo;
-    const nuevoSaldo = await movimientocajaService.updateCaja(codigoCaja, req.body);
+    const nuevoSaldo = await movimientocajaService.updateCaja(codigoCaja, req.body, req.idPersonal);
     res.json({ message: 'Caja actualizada con éxito', codigoCaja, nuevoSaldo });
   } catch (error) {
     if (error.message.includes('Caja no encontrada')) {

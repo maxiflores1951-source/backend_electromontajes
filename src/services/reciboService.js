@@ -17,7 +17,7 @@ const generarCodigoRecibo = async (connection) => {
   }
 };
 
-const create = async (data) => {
+const create = async (data, idPersonal) => {
   const {
     fecha,
     moneda,
@@ -30,6 +30,7 @@ const create = async (data) => {
     otrosimpuestos,
     formasDePago,
     NroCmp,
+    id_creado,
   } = data;
 
   if (!fecha || !moneda || !id_cliente || !id_razonsocial || !importe || !NroCmp) {
@@ -55,6 +56,7 @@ const create = async (data) => {
       importe,
       observacion,
       NroCmp,
+      id_creado: idPersonal || id_creado || null,
     });
 
     if (detalle && detalle.length > 0) {

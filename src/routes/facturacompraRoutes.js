@@ -10,7 +10,7 @@ router.put('/anular/:codigo', facturacompraController.anular);
 router.get('/filtrar', facturacompraController.filtrar);
 router.get('/facturas-por-servicio/:idServicio', facturacompraController.getFacturasPorServicio);
 router.get('/factura-pendientes', facturacompraController.getFacturasPendientes);
-router.put('/:codigo', facturacompraController.update);
+router.put('/:codigo', authMiddleware, resolvePersonal, facturacompraController.update);
 router.get('/facturas-sin-periodoiva', facturacompraController.getFacturasSinPeriodoIva);
 router.get('/facturas/proveedor', facturacompraController.getFacturasPorProveedor);
 router.get('/facturas-por-razonsocial/:id', facturacompraController.getFacturasPorRazonSocial);
