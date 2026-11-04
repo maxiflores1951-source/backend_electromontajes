@@ -207,9 +207,15 @@ const getFormasPagoFactura = async (codigo) => {
   return rows;
 };
 
-const getFacturaByCodigo = async (codigo) => {
-  const [rows] = await db.query('SELECT *, DATE_FORMAT(fecha, \'%d/%m/%Y\') AS fecha FROM factura_compra WHERE codigo = ?', [codigo]);
+const getFacturaByCodigo = async (codigo, connection) => {
+  const runner = connection || db;
+  const [rows] = await runner.query('SELECT *, DATE_FORMAT(fecha, \'%d/%m/%Y\') AS fecha FROM factura_compra WHERE codigo = ?', [codigo]);
   return rows;
+};
+
+const updateSaldoFacturaCompra = async (connection, codigo, saldo, estado) => {
+  const query = 'UPDATE factura_compra SET saldo = ?, Estado = ? WHERE codigo = ?';
+  await connection.query(query, [saldo, estado, codigo]);
 };
 
 const anularFactura = async (codigo) => {
@@ -1101,6 +1107,7 @@ module.exports = {
   getOtrosImpuestosFactura,
   getFormasPagoFactura,
   getFacturaByCodigo,
+  updateSaldoFacturaCompra,
   anularFactura,
   filtrarFacturas,
   filtrarNotasCredito,

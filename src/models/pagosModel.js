@@ -51,6 +51,17 @@ const updateSaldoFactura = async (connection, importeNum, codigo) => {
   await connection.query(query, [importe, codigo]);
 };
 
+const updateSaldoNotaDebito = async (connection, importeNum, codigo) => {
+  const importe = Math.abs(Number(importeNum) || 0);
+  const query = `
+    UPDATE nota_debito_compra
+    SET saldo = saldo + ?,
+        pagada = IF(saldo >= 0, 1, 0)
+    WHERE codigo = ?
+  `;
+  await connection.query(query, [importe, codigo]);
+};
+
 const insertOtrosImpuestos = async (connection, data) => {
   const query = `
     INSERT INTO otros_impuestos_orden_pago

@@ -386,7 +386,6 @@ const filtrar = async (desde, hasta) => {
   const hastaCompleto = `${hasta} 23:59:59`;
 
   const facturasCompra = await facturacompraModel.filtrarFacturas(desdeCompleto, hastaCompleto);
-  const notasCreditoCompra = await facturacompraModel.filtrarNotasCredito(desdeCompleto, hastaCompleto);
 
   const facturasCompletas = await Promise.all(facturasCompra.map(async (factura) => {
     const movimientos = await facturacompraModel.getMovimientosFactura(factura.codigo);
@@ -403,30 +402,12 @@ const filtrar = async (desde, hasta) => {
     };
   }));
 
-  const notasCreditoCompletas = await Promise.all(notasCreditoCompra.map(async (notaCredito) => {
-    const movimientos = await facturacompraModel.getMovimientosNotaCredito(notaCredito.codigo);
-    const otrosImpuestos = await facturacompraModel.getOtrosImpuestosNotaCredito(notaCredito.codigo);
-    const formasPago = await facturacompraModel.getFormasPagoNotaCredito(notaCredito.codigo);
-
-    return {
-      tipo_documento: 'nota_credito',
-      ...notaCredito,
-      movimientos,
-      otrosImpuestos,
-      formasPago
-    };
-  }));
-
-  const todosLosDocumentos = [...facturasCompletas, ...notasCreditoCompletas]
-    .sort((a, b) => parseFecha(b.fecha) - parseFecha(a.fecha));
-
   return {
     desde,
     hasta,
-    total: todosLosDocumentos.length,
+    total: facturasCompletas.length,
     total_facturas: facturasCompletas.length,
-    total_notas_credito: notasCreditoCompletas.length,
-    documentos: todosLosDocumentos
+    documentos: facturasCompletas
   };
 };
 
@@ -669,7 +650,6 @@ const getFacturasPorProveedor = async (idProveedor, idRazonSocial) => {
   const idRazonSocialNum = Number(idRazonSocial);
 
   const facturas = await facturacompraModel.getFacturasPorProveedor(idProveedorNum, idRazonSocialNum);
-  const notasCredito = await facturacompraModel.getNotasCreditoPorProveedor(idProveedorNum, idRazonSocialNum);
 
   const facturasCompletas = await Promise.all(facturas.map(async (factura) => {
     const movimientos = await facturacompraModel.getMovimientosFactura(factura.codigo);
@@ -685,25 +665,11 @@ const getFacturasPorProveedor = async (idProveedor, idRazonSocial) => {
     };
   }));
 
-  const notasCreditoCompletas = await Promise.all(notasCredito.map(async (notaCredito) => {
-    const movimientos = await facturacompraModel.getMovimientosNotaCredito(notaCredito.codigo);
-    const otrosImpuestos = await facturacompraModel.getOtrosImpuestosNotaCredito(notaCredito.codigo);
-    const formasPago = await facturacompraModel.getFormasPagoNotaCredito(notaCredito.codigo);
-
-    return {
-      ...notaCredito,
-      movimientos,
-      otrosImpuestos,
-      formasPago
-    };
-  }));
-
-  return { facturas: facturasCompletas, notasCredito: notasCreditoCompletas };
+  return { facturas: facturasCompletas };
 };
 
 const getFacturasPorRazonSocial = async (idRazonSocial) => {
   const facturasCompra = await facturacompraModel.getFacturasPorRazonSocial(idRazonSocial);
-  const notasCreditoCompra = await facturacompraModel.getNotasCreditoPorRazonSocial(idRazonSocial);
 
   const facturasCompletas = await Promise.all(facturasCompra.map(async (factura) => {
     const movimientos = await facturacompraModel.getMovimientosFactura(factura.codigo);
@@ -720,24 +686,7 @@ const getFacturasPorRazonSocial = async (idRazonSocial) => {
     };
   }));
 
-  const notasCreditoCompletas = await Promise.all(notasCreditoCompra.map(async (notaCredito) => {
-    const movimientos = await facturacompraModel.getMovimientosNotaCredito(notaCredito.codigo);
-    const otrosImpuestos = await facturacompraModel.getOtrosImpuestosNotaCredito(notaCredito.codigo);
-    const formasPago = await facturacompraModel.getFormasPagoNotaCredito(notaCredito.codigo);
-
-    return {
-      tipo_documento: 'nota_credito',
-      ...notaCredito,
-      movimientos,
-      otrosImpuestos,
-      formasPago
-    };
-  }));
-
-  const todosLosDocumentos = [...facturasCompletas, ...notasCreditoCompletas]
-    .sort((a, b) => parseFecha(a.fecha) - parseFecha(b.fecha));
-
-  return todosLosDocumentos;
+  return facturasCompletas;
 };
 
 const filtrarCostos = async (desde, hasta) => {
@@ -796,7 +745,6 @@ const facturasCompra = await facturacompraModel.getFacturasCostos(desdeCompleto,
     await facturacompraModel.release(connection);
   }
 };
-
 const filtrarCostosTodos = async (desde, hasta) => {
   if (!desde || !hasta) {
     throw new Error('Faltan las fechas desde y hasta');
@@ -819,22 +767,6 @@ const filtrarCostosTodos = async (desde, hasta) => {
         tipo: 'factura_compra',
         ...factura,
         estado: calcularEstadoEfectivo(movimientos, factura.estado),
-        movimientos,
-        otrosImpuestos,
-        formasPago
-      });
-    }));
-
-    const notasCredito = await facturacompraModel.getNotasCreditoCostos(desdeCompleto, hastaCompleto, connection);
-
-    const notasCreditoCompletas = await Promise.all(notasCredito.map(async (nota) => {
-      const movimientos = await facturacompraModel.getMovimientosNotaCredito(nota.codigo);
-      const otrosImpuestos = await facturacompraModel.getOtrosImpuestosNotaCredito(nota.codigo);
-      const formasPago = await facturacompraModel.getFormasPagoNotaCredito(nota.codigo);
-
-      return normalizarDocumento({
-        tipo: 'nota_credito_compra',
-        ...nota,
         movimientos,
         otrosImpuestos,
         formasPago
@@ -879,14 +811,14 @@ const filtrarCostosTodos = async (desde, hasta) => {
       })
     );
 
-    const pagosTotales = [...facturasCompletas, ...notasCreditoCompletas, ...otrosPagosCompletos, ...ordenesPagoCompletas];
+    const pagosTotales = [...facturasCompletas, ...otrosPagosCompletos, ...ordenesPagoCompletas];
 
     return {
       desde,
       hasta,
       totalPagos: pagosTotales.length,
       totalFacturas: facturasCompletas.length,
-      totalNotasCredito: notasCreditoCompletas.length,
+      totalNotasCredito: 0,
       totalOtrosPagos: otrosPagosCompletos.length,
       totalOrdenesPago: ordenesPagoCompletas.length,
       totalImpuestos: impuestosNormalizados.length,

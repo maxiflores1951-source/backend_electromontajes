@@ -1,4 +1,5 @@
 const notacreditocompraModel = require('../models/notacreditocompraModel');
+const facturacompraModel = require('../models/facturacompraModel');
 
 const normalizarTipoComprobante = (valor) => {
   if (valor === null || valor === undefined || valor === '') return valor;
@@ -62,7 +63,8 @@ const create = async (data, idPersonal) => {
 
   const tipoCmpNormalizado = normalizarTipoComprobante(tipoCmp);
 
-  const saldoFinal = typeof saldo === 'number' && !isNaN(saldo) ? saldo : 0;
+  const importeNC = Number(importe) || 0;
+  let saldoFinalNota = typeof saldo === 'number' && !isNaN(saldo) ? Number(saldo) : importeNC;
   const idResponsable = idPersonal || data.id_responsable || null;
 
   const connection = await notacreditocompraModel.getConnection();
@@ -72,6 +74,28 @@ const create = async (data, idPersonal) => {
 
   try {
     await notacreditocompraModel.beginTransaction(connection);
+
+    if (id_factura_compra) {
+      const facturaRows = await facturacompraModel.getFacturaByCodigo(id_factura_compra, connection);
+      if (!facturaRows || facturaRows.length === 0) {
+        throw new Error('La factura de compra seleccionada no existe');
+      }
+      const factura = facturaRows[0];
+      if (factura.anulada == 1) {
+        throw new Error('No se puede aplicar una nota de crédito a una factura anulada');
+      }
+      const saldoFactura = Number(factura.saldo) || 0;
+      if (importeNC <= 0) {
+        throw new Error('El importe de la nota de crédito debe ser mayor a 0');
+      }
+      if (importeNC > saldoFactura) {
+        throw new Error('El importe de la nota de crédito no puede superar el saldo de la factura de compra');
+      }
+      const nuevoSaldoFactura = saldoFactura - importeNC;
+      const nuevoEstadoFactura = nuevoSaldoFactura <= 0 ? 'Pagada' : (factura.Estado || factura.estado || 'Completa');
+      await facturacompraModel.updateSaldoFacturaCompra(connection, id_factura_compra, nuevoSaldoFactura, nuevoEstadoFactura);
+      saldoFinalNota = importeNC;
+    }
 
     while (intentos < MAX_INTENTOS) {
       codigoNotaCredito = await generarCodigoNotaCredito(connection);
@@ -100,7 +124,7 @@ const create = async (data, idPersonal) => {
           importe,
           observacion,
           estado: 'Completa',
-          saldoFinal,
+          saldoFinalNota,
           id_factura_compra,
           id_creado: idPersonal || data.id_creado || null
         });
