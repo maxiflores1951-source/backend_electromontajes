@@ -6,6 +6,12 @@ const normalizarTipoComprobante = (valor) => {
   return String(valor).trim().padStart(3, '0');
 };
 
+const redondear2 = (valor) => {
+  const numero = Number(valor);
+  if (isNaN(numero)) return 0;
+  return Math.round(numero * 100) / 100;
+};
+
 const generarCodigoNotaCredito = async (connection) => {
   const [rows] = await connection.query(
     'SELECT MAX(codigo) AS ultimo FROM nota_credito_compra FOR UPDATE'
@@ -63,9 +69,10 @@ const create = async (data, idPersonal) => {
 
   const tipoCmpNormalizado = normalizarTipoComprobante(tipoCmp);
 
-  const importeNC = Number(importe) || 0;
-  let saldoFinalNota = typeof saldo === 'number' && !isNaN(saldo) ? Number(saldo) : importeNC;
+  const importeNC = redondear2(importe);
+  let saldoFinalNota = typeof saldo === 'number' && !isNaN(saldo) ? redondear2(saldo) : importeNC;
   const idResponsable = idPersonal || data.id_responsable || null;
+  let importeAplicado = 0;
 
   const connection = await notacreditocompraModel.getConnection();
   let codigoNotaCredito;
@@ -73,10 +80,14 @@ const create = async (data, idPersonal) => {
   const MAX_INTENTOS = 5;
 
   try {
+    await notacreditocompraModel.ensureDetalleImputacionTable(connection);
     await notacreditocompraModel.beginTransaction(connection);
 
     if (id_factura_compra) {
-      const facturaRows = await facturacompraModel.getFacturaByCodigo(id_factura_compra, connection);
+      const [facturaRows] = await connection.query(
+        'SELECT codigo, saldo, anulada, Estado FROM factura_compra WHERE codigo = ? FOR UPDATE',
+        [id_factura_compra]
+      );
       if (!facturaRows || facturaRows.length === 0) {
         throw new Error('La factura de compra seleccionada no existe');
       }
@@ -84,18 +95,29 @@ const create = async (data, idPersonal) => {
       if (factura.anulada == 1) {
         throw new Error('No se puede aplicar una nota de crédito a una factura anulada');
       }
-      const saldoFactura = Number(factura.saldo) || 0;
       if (importeNC <= 0) {
         throw new Error('El importe de la nota de crédito debe ser mayor a 0');
       }
-      if (importeNC > saldoFactura) {
-        throw new Error('El importe de la nota de crédito no puede superar el saldo de la factura de compra');
+
+      const saldoFactura = Number(factura.saldo) || 0;
+      // Se aplica a la factura todo lo que pueda cubrir; lo que sobra queda
+      // pendiente en la nota de crédito para imputarlo más adelante.
+      importeAplicado = redondear2(Math.min(importeNC, saldoFactura));
+
+      if (importeAplicado > 0) {
+        const nuevoSaldoFactura = redondear2(saldoFactura - importeAplicado);
+        const nuevoEstadoFactura = nuevoSaldoFactura <= 0 ? 'Pagada' : (factura.Estado || factura.estado || 'Completa');
+        await facturacompraModel.updateSaldoFacturaCompra(connection, id_factura_compra, nuevoSaldoFactura, nuevoEstadoFactura);
+        await connection.query(
+          'UPDATE factura_compra SET pagada = IF(saldo <= 0, 1, 0) WHERE codigo = ?',
+          [id_factura_compra]
+        );
       }
-      const nuevoSaldoFactura = saldoFactura - importeNC;
-      const nuevoEstadoFactura = nuevoSaldoFactura <= 0 ? 'Pagada' : (factura.Estado || factura.estado || 'Completa');
-      await facturacompraModel.updateSaldoFacturaCompra(connection, id_factura_compra, nuevoSaldoFactura, nuevoEstadoFactura);
-      saldoFinalNota = importeNC;
+
+      saldoFinalNota = redondear2(Math.max(0, importeNC - importeAplicado));
     }
+
+    const pagadaFinal = saldoFinalNota <= 0 ? 1 : 0;
 
     while (intentos < MAX_INTENTOS) {
       codigoNotaCredito = await generarCodigoNotaCredito(connection);
@@ -125,6 +147,7 @@ const create = async (data, idPersonal) => {
           observacion,
           estado: 'Completa',
           saldoFinalNota,
+          pagada: pagadaFinal,
           id_factura_compra,
           id_creado: idPersonal || data.id_creado || null
         });
@@ -142,6 +165,16 @@ const create = async (data, idPersonal) => {
       throw new Error('No se pudo generar un código único después de varios intentos');
     }
 
+    if (importeAplicado > 0 && id_factura_compra) {
+      await notacreditocompraModel.insertDetalleImputacion(
+        connection,
+        codigoNotaCredito,
+        id_factura_compra,
+        null,
+        importeAplicado
+      );
+    }
+
     const notaCreditoInsertada = await notacreditocompraModel.getNotaCreditoByCodigo(connection, codigoNotaCredito);
     if (notaCreditoInsertada.length === 0) {
       throw new Error('Nota de crédito recién insertada no encontrada, abortando');
@@ -156,8 +189,8 @@ const create = async (data, idPersonal) => {
         descuento, precio_final, codigo_remito,
         cantidad_remitos, saldo
       }) => {
-        if (!nombre || !unidad || !cantidad || !precio) {
-          throw new Error(`Datos incompletos para el item: ${JSON.stringify({ nombre, unidad, cantidad, precio })}`);
+        if (!nombre || !unidad || cantidad == null || precio_final == null) {
+          throw new Error(`Datos incompletos para el item: ${JSON.stringify({ nombre, unidad, cantidad, precio_final })}`);
         }
 
         return [
@@ -170,9 +203,9 @@ const create = async (data, idPersonal) => {
           unidad,
           nombre,
           cantidad,
-          precio,
+          precio_final,
           descuento ?? 0,
-          precio_final ?? 0,
+          precio_final,
           importe ?? 0,
           codigo_orden ?? null,
           iva_compras ?? 0,
@@ -229,7 +262,138 @@ const create = async (data, idPersonal) => {
     }
 
     await notacreditocompraModel.commit(connection);
-    return { codigoNotaCredito, id_factura_compra: id_factura_compra || null };
+    return {
+      codigoNotaCredito,
+      id_factura_compra: id_factura_compra || null,
+      importe_aplicado: importeAplicado,
+      saldo_pendiente: redondear2(saldoFinalNota),
+    };
+  } catch (error) {
+    await notacreditocompraModel.rollback(connection);
+    throw error;
+  } finally {
+    await notacreditocompraModel.release(connection);
+  }
+};
+
+/**
+ * Imputa una nota de crédito de compra contra facturas de compra y/o notas
+ * de débito. Reduce el saldo de la NC y el de cada comprobante, y guarda la
+ * relación en detalle_nota_credito_compra.
+ */
+const imputar = async (codigo, data) => {
+  const detalle = Array.isArray(data?.detalle) ? data.detalle : [];
+
+  if (!codigo) throw new Error('Falta el código de la nota de crédito');
+  if (detalle.length === 0) {
+    throw new Error('Debe indicar al menos un comprobante para imputar');
+  }
+
+  const connection = await notacreditocompraModel.getConnection();
+
+  try {
+    await notacreditocompraModel.ensureDetalleImputacionTable(connection);
+    await notacreditocompraModel.beginTransaction(connection);
+
+    const [ncRows] = await connection.query(
+      'SELECT codigo, saldo, anulada FROM nota_credito_compra WHERE codigo = ? FOR UPDATE',
+      [codigo]
+    );
+    if (ncRows.length === 0) throw new Error('La nota de crédito no existe');
+    if (Number(ncRows[0].anulada) === 1) throw new Error('La nota de crédito está anulada');
+
+    let saldoNc = Number(ncRows[0].saldo) || 0;
+
+    const total = detalle.reduce(
+      (sum, item) => sum + Math.abs(Number(item.importe) || 0),
+      0
+    );
+    if (total <= 0) throw new Error('El importe a imputar debe ser mayor a cero');
+    if (total > saldoNc + 0.001) {
+      throw new Error('El importe a imputar supera el saldo de la nota de crédito');
+    }
+
+    for (const item of detalle) {
+      const importe = Math.abs(Number(item.importe) || 0);
+      if (importe <= 0) continue;
+
+      const codigoDoc = String(
+        item.codigo_factura_compra ?? item.codigo_notadebito_compra ?? item.codigo ?? ''
+      ).trim();
+      if (!codigoDoc) throw new Error('Falta el comprobante a imputar');
+
+      const esNotaDebito =
+        String(item.tipo ?? '').toUpperCase() === 'ND' || codigoDoc.startsWith('NDB');
+
+      if (esNotaDebito) {
+        const [ndRows] = await connection.query(
+          'SELECT codigo, saldo FROM nota_debito_compra WHERE codigo = ? FOR UPDATE',
+          [codigoDoc]
+        );
+        if (ndRows.length === 0) throw new Error(`La nota de débito ${codigoDoc} no existe`);
+
+        const saldoNd = Number(ndRows[0].saldo) || 0;
+        if (importe > saldoNd + 0.001) {
+          throw new Error(`El importe supera el saldo de la nota de débito ${codigoDoc}`);
+        }
+
+        const nuevoSaldo = Math.max(0, saldoNd - importe);
+        await connection.query(
+          'UPDATE nota_debito_compra SET saldo = ?, pagada = IF(? <= 0, 1, 0) WHERE codigo = ?',
+          [nuevoSaldo, nuevoSaldo, codigoDoc]
+        );
+        await notacreditocompraModel.insertDetalleImputacion(
+          connection,
+          codigo,
+          null,
+          codigoDoc,
+          importe
+        );
+      } else {
+        const [fcRows] = await connection.query(
+          'SELECT codigo, saldo, anulada, Estado FROM factura_compra WHERE codigo = ? FOR UPDATE',
+          [codigoDoc]
+        );
+        if (fcRows.length === 0) throw new Error(`La factura ${codigoDoc} no existe`);
+        if (Number(fcRows[0].anulada) === 1) {
+          throw new Error(`La factura ${codigoDoc} está anulada`);
+        }
+
+        const saldoFc = Number(fcRows[0].saldo) || 0;
+        if (importe > saldoFc + 0.001) {
+          throw new Error(`El importe supera el saldo de la factura ${codigoDoc}`);
+        }
+
+        const nuevoSaldo = Math.max(0, saldoFc - importe);
+        const nuevoEstado = nuevoSaldo <= 0 ? 'Pagada' : (fcRows[0].Estado || 'Completa');
+        await facturacompraModel.updateSaldoFacturaCompra(
+          connection,
+          codigoDoc,
+          nuevoSaldo,
+          nuevoEstado
+        );
+        await connection.query(
+          'UPDATE factura_compra SET pagada = IF(saldo <= 0, 1, 0) WHERE codigo = ?',
+          [codigoDoc]
+        );
+        await notacreditocompraModel.insertDetalleImputacion(
+          connection,
+          codigo,
+          codigoDoc,
+          null,
+          importe
+        );
+      }
+    }
+
+    saldoNc = Math.max(0, saldoNc - total);
+    await connection.query(
+      'UPDATE nota_credito_compra SET saldo = ?, pagada = IF(? <= 0, 1, 0) WHERE codigo = ?',
+      [saldoNc, saldoNc, codigo]
+    );
+
+    await notacreditocompraModel.commit(connection);
+    return { codigo, saldo_pendiente: saldoNc };
   } catch (error) {
     await notacreditocompraModel.rollback(connection);
     throw error;
@@ -259,7 +423,18 @@ const getAll = async () => {
   return notasCreditoCompletas;
 };
 
+/**
+ * Imputaciones de notas de crédito contra facturas de compra / notas de débito.
+ * Sirve para saber qué comprobantes ya fueron aplicados y dejarlos visibles
+ * en la cuenta corriente aunque su saldo sea 0.
+ */
+const getImputaciones = async () => {
+  return await notacreditocompraModel.getDetalleImputaciones();
+};
+
 module.exports = {
   create,
+  imputar,
   getAll,
+  getImputaciones,
 };

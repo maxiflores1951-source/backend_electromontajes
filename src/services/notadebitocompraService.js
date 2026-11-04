@@ -132,8 +132,8 @@ const create = async (data, idPersonal) => {
         descuento, precio_final, codigo_remito,
         cantidad_remitos, saldo
       }) => {
-        if (!nombre || !unidad || !cantidad || !precio) {
-          throw new Error(`Datos incompletos para el item: ${JSON.stringify({ nombre, unidad, cantidad, precio })}`);
+        if (!nombre || !unidad || cantidad == null || precio_final == null) {
+          throw new Error(`Datos incompletos para el item: ${JSON.stringify({ nombre, unidad, cantidad, precio_final })}`);
         }
 
         return [
@@ -146,9 +146,9 @@ const create = async (data, idPersonal) => {
           unidad,
           nombre,
           cantidad,
-          precio,
+          precio_final,
           descuento ?? 0,
-          precio_final ?? 0,
+          precio_final,
           importe ?? 0,
           codigo_orden ?? null,
           iva_compras ?? 0,

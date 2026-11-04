@@ -119,8 +119,8 @@ const restoreSaldoNotaDebito = async (connection, importeNum, codigo) => {
   const importe = Math.abs(Number(importeNum) || 0);
   const query = `
     UPDATE nota_debito_compra
-    SET saldo = saldo + ?,
-        pagada = IF(saldo > 0, 0, 1)
+    SET saldo = GREATEST(saldo - ?, 0),
+        pagada = IF(saldo >= 0, 1, 0)
     WHERE codigo = ?
   `;
   await connection.query(query, [importe, codigo]);
@@ -236,7 +236,16 @@ const getNotasCreditoByOrdenPago = async (connection, codigoOrdenPago) => {
 };
 
 const getNotasDebitoByOrdenPago = async (connection, codigoOrdenPago) => {
-  return [];
+  const runner = connection || db;
+  const query = `
+    SELECT nd.*, dop.importe AS importe_aplicado
+    FROM detalle_orden_pago dop
+    JOIN nota_debito_compra nd ON nd.codigo = dop.codigo_notacredito_compra
+    WHERE dop.codigo_orden_pago = ?
+      AND dop.codigo_notacredito_compra LIKE 'NDB%'
+  `;
+  const [rows] = await runner.query(query, [codigoOrdenPago]);
+  return rows;
 };
 
 const getImpuestosByOrdenPago = async (connection, codigoOrdenPago) => {

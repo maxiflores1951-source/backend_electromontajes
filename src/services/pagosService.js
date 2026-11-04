@@ -36,7 +36,12 @@ const validarDatos = async (data) => {
       }
       codigosVistos.add(codigo);
       const esNotaDebito = codigo.startsWith('NDB');
-      const table = esNotaDebito ? 'nota_debito_compra' : 'factura_compra';
+      const esNotaCredito = codigo.startsWith('NCC');
+      const table = esNotaDebito
+        ? 'nota_debito_compra'
+        : esNotaCredito
+          ? 'nota_credito_compra'
+          : 'factura_compra';
       const [rows] = await db.query(`SELECT 1 FROM ${table} WHERE codigo = ?`, [codigo]);
       if (rows.length === 0) {
         throw new Error(`El código ${codigo} no existe en ${table}`);
@@ -220,10 +225,15 @@ const update = async (codigo, data, idUsuario) => {
     const detalleViejo = await pagosModel.getDetalleOrdenPago(connection, codigo);
     for (const item of detalleViejo) {
       const importeViejo = Number(item.importe) || 0;
+      const codigoNota = item.codigo_notacredito_compra
+        ? String(item.codigo_notacredito_compra)
+        : '';
       if (item.codigo_factura_compra) {
         await pagosModel.restoreSaldoFactura(connection, importeViejo, item.codigo_factura_compra);
-      } else if (item.codigo_notadebito_compra) {
-        await pagosModel.restoreSaldoNotaDebito(connection, importeViejo, item.codigo_notadebito_compra);
+      } else if (codigoNota.startsWith('NDB')) {
+        await pagosModel.restoreSaldoNotaDebito(connection, importeViejo, codigoNota);
+      } else if (codigoNota.startsWith('NCC')) {
+        await pagosModel.restoreSaldoNotaCredito(connection, importeViejo, codigoNota);
       }
     }
 
@@ -243,7 +253,8 @@ const update = async (codigo, data, idUsuario) => {
 
     if (Array.isArray(detalle) && detalle.length > 0) {
       for (const item of detalle) {
-        const detCodigo = item.codigo_factura_compra ?? null;
+        const detCodigo =
+          item.codigo_factura_compra ?? item.codigo_notacredito_compra ?? null;
         const importeNum = Number(item.importe) || 0;
         const descripcion = item.descripcion || null;
 
@@ -259,17 +270,20 @@ const update = async (codigo, data, idUsuario) => {
         }
 
         const esNotaDebito = detCodigo.startsWith('NDB');
+        const esNotaCredito = detCodigo.startsWith('NCC');
 
         await pagosModel.insertDetalleOrdenPago(connection, [
           codigo,
-          esNotaDebito ? null : detCodigo,
-          esNotaDebito ? detCodigo : null,
+          esNotaDebito || esNotaCredito ? null : detCodigo,
+          esNotaDebito || esNotaCredito ? detCodigo : null,
           descripcion,
           importeNum,
         ]);
 
         if (esNotaDebito) {
           await pagosModel.updateSaldoNotaDebito(connection, importeNum, detCodigo);
+        } else if (esNotaCredito) {
+          await pagosModel.updateSaldoNotaCredito(connection, importeNum, detCodigo);
         } else {
           await pagosModel.updateSaldoFactura(connection, importeNum, detCodigo);
         }
@@ -316,6 +330,7 @@ ordenPago.facturas_compra = await pagosModel.getFacturasByOrdenPago(connection, 
       ordenPago.otros_impuestos = await pagosModel.getImpuestosByOrdenPago(connection, ordenPago.codigo);
       ordenPago.formas_pago = await pagosModel.getFormasPagoByOrdenPago(connection, ordenPago.codigo);
       ordenPago.notas_debito_compra = await pagosModel.getNotasDebitoByOrdenPago(connection, ordenPago.codigo);
+      ordenPago.notas_credito_compra = await pagosModel.getNotasCreditoByOrdenPago(connection, ordenPago.codigo);
     }
 
     return ordenesPago;

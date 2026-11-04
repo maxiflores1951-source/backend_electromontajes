@@ -2,18 +2,39 @@ const notacreditocompraService = require('../services/notacreditocompraService')
 
 const create = async (req, res) => {
   try {
-    const { codigoNotaCredito, id_factura_compra } = await notacreditocompraService.create(req.body, req.idPersonal);
+    const resultado = await notacreditocompraService.create(req.body, req.idPersonal);
     res.status(201).json({
       mensaje: 'Nota de crédito creada correctamente',
-      codigoNotaCredito,
-      id_factura_compra: id_factura_compra || null
+      ...resultado,
     });
   } catch (error) {
-    if (error.message.includes('Faltan datos obligatorios') || error.message.includes('Datos incompletos')) {
+    if (
+      error.message.includes('Faltan datos obligatorios') ||
+      error.message.includes('Datos incompletos') ||
+      error.message.includes('no existe') ||
+      error.message.includes('no se puede aplicar') ||
+      error.message.includes('debe ser mayor a 0')
+    ) {
       return res.status(400).json({ error: error.message });
     }
     console.error('Error al insertar nota de crédito:', error);
     res.status(500).json({ error: 'Error al procesar la nota de crédito', detalles: error.message });
+  }
+};
+
+const imputar = async (req, res) => {
+  try {
+    const resultado = await notacreditocompraService.imputar(
+      req.params.codigo,
+      req.body
+    );
+    res.json({
+      mensaje: 'Nota de crédito imputada correctamente',
+      ...resultado,
+    });
+  } catch (error) {
+    console.error('Error al imputar la nota de crédito:', error);
+    res.status(400).json({ message: error.message });
   }
 };
 
@@ -30,7 +51,22 @@ const getAll = async (req, res) => {
   }
 };
 
+const getImputaciones = async (req, res) => {
+  try {
+    const imputaciones = await notacreditocompraService.getImputaciones();
+    res.json(imputaciones);
+  } catch (error) {
+    console.error('Error al obtener las imputaciones de notas de crédito:', error);
+    res.status(500).json({
+      error: 'Error al obtener las imputaciones de notas de crédito',
+      details: error.message,
+    });
+  }
+};
+
 module.exports = {
   create,
+  imputar,
   getAll,
+  getImputaciones,
 };

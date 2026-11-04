@@ -16,8 +16,8 @@ const insertNotaCredito = async (connection, params) => {
     codigoNotaCredito, fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz,
     id_proveedor, id_plancompra, id_motivo, id_servicio, id_movil,
     id_responsable, id_razonsocial, totalIVA21, totalIVA27, totalIVA10,
-    bonificacion, periodoiva, importe, observacion, estado, saldoFinal, id_factura_compra,
-    id_creado
+    bonificacion, periodoiva, importe, observacion, estado, saldoFinalNota, pagada,
+    id_factura_compra, id_creado
   } = params;
 
   const query = `
@@ -25,9 +25,9 @@ const insertNotaCredito = async (connection, params) => {
       codigo, fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz,
       id_proveedor, id_plancompra, id_motivo, id_servicio, id_movil,
       id_responsable, id_razonsocial, totalIVA21, totalIVA27, totalIVA10,
-      bonificacion, periodoiva, importe, observacion, anulada, estado, saldo,
+      bonificacion, periodoiva, importe, observacion, anulada, estado, saldo, pagada,
       id_factura_compra, id_creado
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`;
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`;
 
   const values = [
     codigoNotaCredito, fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz || 1,
@@ -38,7 +38,8 @@ const insertNotaCredito = async (connection, params) => {
     null,
     importe, observacion || null,
     estado || 'Completa',
-    saldoFinal,
+    saldoFinalNota ?? 0,
+    pagada ?? 0,
     id_factura_compra || null,
     id_creado || null
   ];
@@ -157,6 +158,70 @@ const getFormasPagoNotaCredito = async (codigo) => {
   return rows;
 };
 
+let tablaImputacionAsegurada = false;
+
+/**
+ * Crea (una sola vez por proceso) la tabla que relaciona una nota de crédito
+ * con las facturas de compra / notas de débito contra las que se imputa.
+ */
+const ensureDetalleImputacionTable = async (connection) => {
+  if (tablaImputacionAsegurada) return;
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS detalle_nota_credito_compra (
+      id INT(11) NOT NULL AUTO_INCREMENT,
+      codigo_nota_credito_compra VARCHAR(20) NOT NULL,
+      codigo_factura_compra VARCHAR(20) DEFAULT NULL,
+      codigo_notadebito_compra VARCHAR(20) DEFAULT NULL,
+      importe DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+      fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY idx_nc (codigo_nota_credito_compra),
+      KEY idx_fc (codigo_factura_compra),
+      KEY idx_nd (codigo_notadebito_compra)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  tablaImputacionAsegurada = true;
+};
+
+const insertDetalleImputacion = async (
+  connection,
+  codigoNotaCredito,
+  codigoFacturaCompra,
+  codigoNotaDebitoCompra,
+  importe
+) => {
+  await connection.query(
+    `INSERT INTO detalle_nota_credito_compra
+       (codigo_nota_credito_compra, codigo_factura_compra, codigo_notadebito_compra, importe)
+     VALUES (?, ?, ?, ?)`,
+    [
+      codigoNotaCredito,
+      codigoFacturaCompra || null,
+      codigoNotaDebitoCompra || null,
+      importe,
+    ]
+  );
+};
+
+const getDetalleImputaciones = async () => {
+  const connection = await getConnection();
+  try {
+    await ensureDetalleImputacionTable(connection);
+    const [rows] = await connection.query(
+      `SELECT codigo_nota_credito_compra,
+              codigo_factura_compra,
+              codigo_notadebito_compra,
+              importe,
+              fecha_creacion
+       FROM detalle_nota_credito_compra
+       ORDER BY id DESC`
+    );
+    return rows;
+  } finally {
+    await release(connection);
+  }
+};
+
 module.exports = {
   getConnection,
   beginTransaction,
@@ -174,4 +239,7 @@ module.exports = {
   getMovimientosNotaCredito,
   getOtrosImpuestosNotaCredito,
   getFormasPagoNotaCredito,
+  ensureDetalleImputacionTable,
+  insertDetalleImputacion,
+  getDetalleImputaciones,
 };

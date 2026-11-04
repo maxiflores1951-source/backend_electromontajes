@@ -27,7 +27,8 @@ const insertFactura = async (connection, params) => {
     codigoFactura, fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz,
     id_proveedor, id_plancompra, id_motivo, id_servicio, id_movil,
     id_responsable, id_razonsocial, totalIVA21, totalIVA27, totalIVA10,
-    bonificacion, periodoiva, importe, observacion, estado, saldoFinal
+    bonificacion, periodoiva, importe, observacion, estado, saldoFinal,
+    id_creado, fecha_creacion
   } = params;
 
   const query = `
@@ -35,8 +36,9 @@ const insertFactura = async (connection, params) => {
       codigo, fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz,
       id_proveedor, id_plancompra, id_motivo, id_servicio, id_movil,
       id_responsable, id_razonsocial, totalIVA21, totalIVA27, totalIVA10,
-      bonificacion, periodoiva, importe, observacion, anulada, Estado, saldo
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`;
+      bonificacion, periodoiva, importe, observacion, anulada, Estado, saldo,
+      id_creado, fecha_creacion
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`;
 
   const values = [
     codigoFactura, fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz || 1,
@@ -44,11 +46,13 @@ const insertFactura = async (connection, params) => {
     id_responsable || null, id_razonsocial,
     totalIVA21 || 0, totalIVA27 || 0, totalIVA10 || 0,
     bonificacion || 0,
-    null,
+    periodoiva || null,
     importe,
     observacion || null,
     estado || 'Completa',
-    saldoFinal
+    saldoFinal,
+    id_creado || null,
+    fecha_creacion || new Date()
   ];
 
   await connection.query(query, values);
@@ -383,7 +387,8 @@ const updateFactura = async (connection, params) => {
     codigoFactura, fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz,
     id_proveedor, id_plancompra, id_motivo, idServicioFinal, idMovilFinal,
     id_responsable, id_razonsocial, totalIVA21, totalIVA27, totalIVA10,
-    bonificacion, periodoiva, importe, observacion, estado, pagada, saldoFinal
+    bonificacion, periodoiva, importe, observacion, estado, pagada, saldoFinal,
+    id_modificado, fecha_modificacion
   } = params;
 
   const query = `
@@ -391,7 +396,8 @@ const updateFactura = async (connection, params) => {
       fecha = ?, tipoCmp = ?, codigoletra = ?, ptoVta = ?, NroCmp = ?, moneda = ?, ctz = ?,
       id_proveedor = ?, id_plancompra = ?, id_motivo = ?, id_servicio = ?, id_movil = ?,
       id_responsable = ?, id_razonsocial = ?, totalIVA21 = ?, totalIVA27 = ?, totalIVA10 = ?,
-      bonificacion = ?, periodoiva = ?, importe = ?, observacion = ?, Estado = ?, pagada = ?, saldo = ?
+      bonificacion = ?, periodoiva = ?, importe = ?, observacion = ?, Estado = ?, pagada = ?, saldo = ?,
+      id_modificado = ?, fecha_modificacion = ?
     WHERE codigo = ?`;
 
   const values = [
@@ -405,6 +411,8 @@ const updateFactura = async (connection, params) => {
     estado || 'Completa',
     pagada !== undefined ? pagada : 0,
     saldoFinal,
+    id_modificado || null,
+    fecha_modificacion || new Date(),
     codigoFactura
   ];
 
