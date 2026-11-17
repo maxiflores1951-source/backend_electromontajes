@@ -57,6 +57,72 @@ const getFacturaByCodigo = async (connection, codigo) => {
   return rows;
 };
 
+const getNotaCreditoRow = async (connection, codigo) => {
+  const [rows] = await connection.query(
+    'SELECT * FROM nota_credito_compra WHERE codigo = ? FOR UPDATE',
+    [codigo]
+  );
+  return rows;
+};
+
+const updateNotaCredito = async (connection, codigo, params) => {
+  const {
+    fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz,
+    id_proveedor, id_plancompra, id_motivo, id_servicio, id_movil,
+    id_razonsocial, id_responsable, totalIVA21, totalIVA27, totalIVA10,
+    bonificacion, importe, observacion, estado, saldoFinalNota, pagada,
+    id_factura_compra, id_modificado
+  } = params;
+
+  await connection.query(
+    `UPDATE nota_credito_compra SET
+       fecha = ?, tipoCmp = ?, codigoletra = ?, ptoVta = ?, NroCmp = ?, moneda = ?, ctz = ?,
+       id_proveedor = ?, id_plancompra = ?, id_motivo = ?, id_servicio = ?, id_movil = ?,
+       id_razonsocial = ?, id_responsable = ?, totalIVA21 = ?, totalIVA27 = ?, totalIVA10 = ?,
+       bonificacion = ?, importe = ?, observacion = ?, estado = ?, saldo = ?, pagada = ?,
+       id_factura_compra = ?, id_modificado = ?
+     WHERE codigo = ?`,
+    [
+      fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz || 1,
+      id_proveedor, id_plancompra, id_motivo, id_servicio || null, id_movil || null,
+      id_razonsocial, id_responsable || null,
+      totalIVA21 || 0, totalIVA27 || 0, totalIVA10 || 0,
+      bonificacion || 0.00, importe, observacion || null, estado || 'Completa',
+      saldoFinalNota ?? 0, pagada ?? 0, id_factura_compra || null,
+      id_modificado || null, codigo
+    ]
+  );
+};
+
+const deleteMovimientos = async (connection, codigo) => {
+  await connection.query(
+    'DELETE FROM movimientos_nota_credito_compra WHERE codigo_nota_credito_compra = ?',
+    [codigo]
+  );
+};
+
+const deleteOtrosImpuestos = async (connection, codigo) => {
+  await connection.query(
+    'DELETE FROM otros_impuestos_nota_credito_compra WHERE codigo_nota_credito_compra = ?',
+    [codigo]
+  );
+};
+
+const deleteFormasPago = async (connection, codigo) => {
+  await connection.query(
+    'DELETE FROM formas_pago_nota_credito_compra WHERE codigo_nota_credito_compra = ?',
+    [codigo]
+  );
+};
+
+const getImputacionesByNota = async (connection, codigo) => {
+  const [rows] = await connection.query(
+    'SELECT * FROM detalle_nota_credito_compra WHERE codigo_nota_credito_compra = ? FOR UPDATE',
+    [codigo]
+  );
+  return rows;
+};
+
 const insertMovimientos = async (connection, codigoNotaCredito, movimientosData) => {
   const query = `
     INSERT INTO movimientos_nota_credito_compra (
@@ -231,6 +297,12 @@ module.exports = {
   getLastCodigo,
   insertNotaCredito,
   getNotaCreditoByCodigo,
+  getNotaCreditoRow,
+  updateNotaCredito,
+  deleteMovimientos,
+  deleteOtrosImpuestos,
+  deleteFormasPago,
+  getImputacionesByNota,
   getFacturaByCodigo,
   insertMovimientos,
   insertOtrosImpuestos,

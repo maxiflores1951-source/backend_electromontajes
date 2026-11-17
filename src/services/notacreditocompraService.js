@@ -30,6 +30,47 @@ const generarCodigoNotaCredito = async (connection) => {
   }
 };
 
+/**
+ * Arma las filas de movimientos_nota_credito_compra a partir de los ítems
+ * que llegan del formulario. Se usa tanto en el alta como en la edición.
+ */
+const mapearMovimientos = (codigoNotaCredito, item) => {
+  return item.map(({
+    tipo_operacion,
+    id_articulo, id_concepto, id_herramienta, id_epp,
+    unidad, nombre, cantidad, precio,
+    importe, codigo_orden, iva_compras,
+    descuento, precio_final, codigo_remito,
+    cantidad_remitos, saldo
+  }) => {
+    if (!nombre || !unidad || cantidad == null || precio_final == null) {
+      throw new Error(`Datos incompletos para el item: ${JSON.stringify({ nombre, unidad, cantidad, precio_final })}`);
+    }
+
+    return [
+      codigoNotaCredito,
+      tipo_operacion,
+      id_articulo ?? null,
+      id_concepto ?? null,
+      id_herramienta ?? null,
+      id_epp ?? null,
+      unidad,
+      nombre,
+      cantidad,
+      precio_final,
+      descuento ?? 0,
+      precio_final,
+      importe ?? 0,
+      codigo_orden ?? null,
+      iva_compras ?? 0,
+      codigo_remito ?? null,
+      1,
+      cantidad_remitos ?? 0.00,
+      saldo ?? 0.00
+    ];
+  });
+};
+
 const create = async (data, idPersonal) => {
   const {
     fecha,
@@ -181,40 +222,7 @@ const create = async (data, idPersonal) => {
     }
 
     if (item && item.length > 0) {
-      const movimientosData = item.map(({
-        tipo_operacion,
-        id_articulo, id_concepto, id_herramienta, id_epp,
-        unidad, nombre, cantidad, precio,
-        importe, codigo_orden, iva_compras,
-        descuento, precio_final, codigo_remito,
-        cantidad_remitos, saldo
-      }) => {
-        if (!nombre || !unidad || cantidad == null || precio_final == null) {
-          throw new Error(`Datos incompletos para el item: ${JSON.stringify({ nombre, unidad, cantidad, precio_final })}`);
-        }
-
-        return [
-          codigoNotaCredito,
-          tipo_operacion,
-          id_articulo ?? null,
-          id_concepto ?? null,
-          id_herramienta ?? null,
-          id_epp ?? null,
-          unidad,
-          nombre,
-          cantidad,
-          precio_final,
-          descuento ?? 0,
-          precio_final,
-          importe ?? 0,
-          codigo_orden ?? null,
-          iva_compras ?? 0,
-          codigo_remito ?? null,
-          1,
-          cantidad_remitos ?? 0.00,
-          saldo ?? 0.00
-        ];
-      });
+      const movimientosData = mapearMovimientos(codigoNotaCredito, item);
 
       await notacreditocompraModel.insertMovimientos(connection, codigoNotaCredito, movimientosData);
     }
@@ -267,6 +275,159 @@ const create = async (data, idPersonal) => {
       id_factura_compra: id_factura_compra || null,
       importe_aplicado: importeAplicado,
       saldo_pendiente: redondear2(saldoFinalNota),
+    };
+  } catch (error) {
+    await notacreditocompraModel.rollback(connection);
+    throw error;
+  } finally {
+    await notacreditocompraModel.release(connection);
+  }
+};
+
+/**
+ * Actualiza una nota de crédito de compra existente: cabecera, artículos,
+ * otros impuestos y formas de pago.
+ *
+ * Las imputaciones ya registradas se conservan: el saldo pendiente se
+ * recalcula como (importe - lo ya imputado). Si la nota todavía no tiene
+ * imputaciones, se puede vincular a una factura de compra aplicando el
+ * importe contra su saldo, igual que en el alta.
+ */
+const update = async (codigo, data, idPersonal) => {
+  const {
+    fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz,
+    id_proveedor, id_plancompra, id_motivo, id_servicio, id_movil,
+    id_razonsocial, id_responsable,
+    totalIVA21, totalIVA27, totalIVA10,
+    bonificacion, periodoiva,
+    importe, observacion, estado,
+    item, otrosimpuestos, formasDePago,
+    id_factura_compra
+  } = data;
+
+  if (!codigo) {
+    throw new Error('Falta el código de la nota de crédito');
+  }
+  if (!fecha || !tipoCmp || !codigoletra || !ptoVta || !NroCmp ||
+      !moneda || !id_proveedor || !id_plancompra || !id_motivo ||
+      !id_razonsocial || !importe) {
+    throw new Error('Faltan datos obligatorios en la nota de crédito de compra');
+  }
+
+  const tipoCmpNormalizado = normalizarTipoComprobante(tipoCmp);
+  const importeNuevo = redondear2(importe);
+
+  const connection = await notacreditocompraModel.getConnection();
+  try {
+    await notacreditocompraModel.ensureDetalleImputacionTable(connection);
+    await notacreditocompraModel.beginTransaction(connection);
+
+    const filas = await notacreditocompraModel.getNotaCreditoRow(connection, codigo);
+    if (!filas || filas.length === 0) {
+      throw new Error('La nota de crédito no existe');
+    }
+    const actual = filas[0];
+    if (Number(actual.anulada) === 1) {
+      throw new Error('La nota de crédito está anulada');
+    }
+
+    const imputaciones = await notacreditocompraModel.getImputacionesByNota(connection, codigo);
+    const totalImputado = redondear2(
+      imputaciones.reduce((sum, imputacion) => sum + (Number(imputacion.importe) || 0), 0)
+    );
+
+    const importeViejo = redondear2(actual.importe);
+    let saldoFinal;
+    let pagadaFinal;
+    let importeAplicado = 0;
+    let facturaVigente = id_factura_compra || null;
+
+    if (totalImputado > 0) {
+      // Hay importes ya aplicados: no se puede bajar del total imputado.
+      if (importeNuevo + 0.001 < totalImputado) {
+        throw new Error(
+          `El importe (${importeNuevo}) no puede ser menor a lo ya imputado (${totalImputado})`
+        );
+      }
+      saldoFinal = redondear2(importeNuevo - totalImputado);
+    } else {
+      // Sin imputaciones registradas se conserva el estado de pago actual y
+      // solo se ajusta por la diferencia del importe. No se tocan los saldos
+      // de las facturas: eso se hace desde la imputación.
+      const saldoActual = redondear2(actual.saldo);
+      saldoFinal = redondear2(Math.max(0, saldoActual + (importeNuevo - importeViejo)));
+    }
+
+    pagadaFinal = saldoFinal <= 0 ? 1 : 0;
+
+    await notacreditocompraModel.updateNotaCredito(connection, codigo, {
+      fecha,
+      tipoCmp: tipoCmpNormalizado,
+      codigoletra,
+      ptoVta,
+      NroCmp,
+      moneda,
+      ctz,
+      id_proveedor,
+      id_plancompra,
+      id_motivo,
+      id_servicio,
+      id_movil,
+      id_razonsocial,
+      id_responsable: id_responsable ?? actual.id_responsable ?? null,
+      totalIVA21,
+      totalIVA27,
+      totalIVA10,
+      bonificacion,
+      importe,
+      observacion,
+      estado: estado || 'Completa',
+      saldoFinalNota: saldoFinal,
+      pagada: pagadaFinal,
+      id_factura_compra: facturaVigente,
+      id_modificado: idPersonal || data.id_modificado || null,
+    });
+
+    await notacreditocompraModel.deleteMovimientos(connection, codigo);
+    if (item && item.length > 0) {
+      const movimientosData = mapearMovimientos(codigo, item);
+      await notacreditocompraModel.insertMovimientos(connection, codigo, movimientosData);
+    }
+
+    await notacreditocompraModel.deleteOtrosImpuestos(connection, codigo);
+    if (otrosimpuestos && otrosimpuestos.length > 0) {
+      const impuestosData = otrosimpuestos.map(({ codigo: codigoImp, codigo_impuesto, valor }) => {
+        const codigoSeleccionado = codigoImp ?? codigo_impuesto;
+        if (!codigoSeleccionado || valor === undefined) {
+          throw new Error(`Datos incompletos para impuesto: ${JSON.stringify({ codigo: codigoImp, valor })}`);
+        }
+        return [codigo, codigoSeleccionado, valor];
+      });
+
+      await notacreditocompraModel.insertOtrosImpuestos(connection, codigo, impuestosData);
+    }
+
+    await notacreditocompraModel.deleteFormasPago(connection, codigo);
+    if (formasDePago && formasDePago.length > 0) {
+      const formasPagoData = formasDePago.map(({ codigo_valor, fecha: fechaPago, importe: importePago }) => {
+        if (!codigo_valor || !fechaPago || importePago === undefined) {
+          throw new Error(
+            `Datos incompletos para forma de pago: ${JSON.stringify({ codigo_valor, fecha: fechaPago, importe: importePago })}`
+          );
+        }
+        return [codigo, codigo_valor, fechaPago, importePago];
+      });
+
+      await notacreditocompraModel.insertFormasPago(connection, codigo, formasPagoData);
+    }
+
+    await notacreditocompraModel.commit(connection);
+    return {
+      codigoNotaCredito: codigo,
+      id_factura_compra: facturaVigente || null,
+      importe_aplicado: importeAplicado,
+      total_imputado: totalImputado,
+      saldo_pendiente: saldoFinal,
     };
   } catch (error) {
     await notacreditocompraModel.rollback(connection);
@@ -434,6 +595,7 @@ const getImputaciones = async () => {
 
 module.exports = {
   create,
+  update,
   imputar,
   getAll,
   getImputaciones,

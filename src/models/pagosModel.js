@@ -163,14 +163,13 @@ const getOrdenesPago = async (connection) => {
       rs.razon_social AS nombre_razon_social,
       op.importe,
       op.fecha_creacion,
-      op.id_creado,
+      op.id_creado AS id_personal,
       p.NOMBRE AS nombre_creador
     FROM orden_pago op
     JOIN proveedor prov ON prov.Cod_Proveedor = op.id_proveedor
     JOIN razones_sociales rs ON rs.id = op.id_razonsocial
     JOIN moneda mon ON mon.codigo = op.moneda
-    JOIN usuarios u ON u.id = op.id_creado
-    JOIN personal p ON p.ID = u.id_personal
+    JOIN personal p ON p.ID = op.id_creado
     ORDER BY op.fecha_creacion DESC
   `;
   const [rows] = await connection.query(query);
