@@ -178,7 +178,7 @@ const insertImputacion = async (connection, codigoNotaCreditoVenta, codigoFactur
 };
 
 const getImputacionesByNota = async (connection, codigo) => {
-  const exec = connection ? connection.query.bind(connection) : db.query;
+  const exec = connection ? connection.query.bind(connection) : db.query.bind(db);
   const [rows] = await exec(
     'SELECT * FROM imputacion_nota_venta_factura_venta WHERE codigo_nota_credito_venta = ?',
     [codigo]
