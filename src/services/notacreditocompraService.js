@@ -342,22 +342,96 @@ const update = async (codigo, data, idPersonal) => {
     let importeAplicado = 0;
     let facturaVigente = id_factura_compra || null;
 
-    if (totalImputado > 0) {
-      // Hay importes ya aplicados: no se puede bajar del total imputado.
-      if (importeNuevo + 0.001 < totalImputado) {
-        throw new Error(
-          `El importe (${importeNuevo}) no puede ser menor a lo ya imputado (${totalImputado})`
+    // 1. Leer imputaciones existentes de esta nota de crédito
+    const imputacionesExistentes = await notacreditocompraModel.getImputacionesByNota(connection, codigo);
+
+    // 2. Revertir saldos de facturas/notas de débito imputadas previamente
+    for (const imp of imputacionesExistentes) {
+      const montoImp = Number(imp.importe) || 0;
+      if (imp.codigo_factura_compra) {
+        const [fcRows] = await connection.query(
+          'SELECT saldo, Estado, anulada FROM factura_compra WHERE codigo = ? FOR UPDATE',
+          [imp.codigo_factura_compra]
         );
+        if (fcRows.length > 0 && Number(fcRows[0].anulada) !== 1) {
+          const saldoActual = Number(fcRows[0].saldo) || 0;
+          const nuevoSaldo = redondear2(saldoActual + montoImp);
+          const nuevoEstado = nuevoSaldo <= 0 ? 'Pagada' : (fcRows[0].Estado || fcRows[0].estado || 'Completa');
+          await facturacompraModel.updateSaldoFacturaCompra(connection, imp.codigo_factura_compra, nuevoSaldo, nuevoEstado);
+          await connection.query(
+            'UPDATE factura_compra SET pagada = IF(saldo <= 0, 1, 0) WHERE codigo = ?',
+            [imp.codigo_factura_compra]
+          );
+        }
       }
-      saldoFinal = redondear2(importeNuevo - totalImputado);
-    } else {
-      // Sin imputaciones registradas se conserva el estado de pago actual y
-      // solo se ajusta por la diferencia del importe. No se tocan los saldos
-      // de las facturas: eso se hace desde la imputación.
-      const saldoActual = redondear2(actual.saldo);
-      saldoFinal = redondear2(Math.max(0, saldoActual + (importeNuevo - importeViejo)));
+      if (imp.codigo_notadebito_compra) {
+        const [ndRows] = await connection.query(
+          'SELECT saldo FROM nota_debito_compra WHERE codigo = ? FOR UPDATE',
+          [imp.codigo_notadebito_compra]
+        );
+        if (ndRows.length > 0) {
+          const saldoActual = Number(ndRows[0].saldo) || 0;
+          const nuevoSaldo = redondear2(saldoActual + montoImp);
+          await connection.query(
+            'UPDATE nota_debito_compra SET saldo = ?, pagada = IF(? <= 0, 1, 0) WHERE codigo = ?',
+            [nuevoSaldo, nuevoSaldo, imp.codigo_notadebito_compra]
+          );
+        }
+      }
     }
 
+    // 3. Eliminar imputaciones viejas
+    await connection.query(
+      'DELETE FROM detalle_nota_credito_compra WHERE codigo_nota_credito_compra = ?',
+      [codigo]
+    );
+
+    // 4. Re-aplicar imputaciones con el nuevo importe (proporcional al importe viejo)
+    let totalNuevoImputado = 0;
+    const factor = importeViejo > 0 ? importeNuevo / importeViejo : 1;
+
+    for (const imp of imputacionesExistentes) {
+      const montoImp = Number(imp.importe) || 0;
+      const nuevoMonto = redondear2(montoImp * factor);
+
+      if (imp.codigo_factura_compra) {
+        const [fcRows] = await connection.query(
+          'SELECT saldo, Estado, anulada FROM factura_compra WHERE codigo = ? FOR UPDATE',
+          [imp.codigo_factura_compra]
+        );
+        if (fcRows.length > 0 && Number(fcRows[0].anulada) !== 1) {
+          const saldoActual = Number(fcRows[0].saldo) || 0;
+          const nuevoSaldo = redondear2(Math.max(0, saldoActual - nuevoMonto));
+          const nuevoEstado = nuevoSaldo <= 0 ? 'Pagada' : (fcRows[0].Estado || fcRows[0].estado || 'Completa');
+          await facturacompraModel.updateSaldoFacturaCompra(connection, imp.codigo_factura_compra, nuevoSaldo, nuevoEstado);
+          await connection.query(
+            'UPDATE factura_compra SET pagada = IF(saldo <= 0, 1, 0) WHERE codigo = ?',
+            [imp.codigo_factura_compra]
+          );
+        }
+        await notacreditocompraModel.insertDetalleImputacion(connection, codigo, imp.codigo_factura_compra, null, nuevoMonto);
+        totalNuevoImputado += nuevoMonto;
+      }
+      if (imp.codigo_notadebito_compra) {
+        const [ndRows] = await connection.query(
+          'SELECT saldo FROM nota_debito_compra WHERE codigo = ? FOR UPDATE',
+          [imp.codigo_notadebito_compra]
+        );
+        if (ndRows.length > 0) {
+          const saldoActual = Number(ndRows[0].saldo) || 0;
+          const nuevoSaldo = redondear2(Math.max(0, saldoActual - nuevoMonto));
+          await connection.query(
+            'UPDATE nota_debito_compra SET saldo = ?, pagada = IF(? <= 0, 1, 0) WHERE codigo = ?',
+            [nuevoSaldo, nuevoSaldo, imp.codigo_notadebito_compra]
+          );
+        }
+        await notacreditocompraModel.insertDetalleImputacion(connection, codigo, null, imp.codigo_notadebito_compra, nuevoMonto);
+        totalNuevoImputado += nuevoMonto;
+      }
+    }
+
+    // 5. Saldo final de la nota de crédito
+    saldoFinal = redondear2(Math.max(0, importeNuevo - totalNuevoImputado));
     pagadaFinal = saldoFinal <= 0 ? 1 : 0;
 
     await notacreditocompraModel.updateNotaCredito(connection, codigo, {
@@ -386,6 +460,7 @@ const update = async (codigo, data, idPersonal) => {
       pagada: pagadaFinal,
       id_factura_compra: facturaVigente,
       id_modificado: idPersonal || data.id_modificado || null,
+      fecha_modificacion: data.fecha_modificacion || new Date().toISOString().slice(0, 19).replace('T', ' '),
     });
 
     await notacreditocompraModel.deleteMovimientos(connection, codigo);

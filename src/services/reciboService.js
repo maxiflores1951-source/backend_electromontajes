@@ -1,6 +1,22 @@
 const db = require('../../db');
 const reciboModel = require('../models/reciboModel');
 
+const formatearFechaParaBD = (fechaStr) => {
+  if (!fechaStr) return null;
+  const s = String(fechaStr).trim();
+  // Ya viene en AAAA-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Formato DD/MM/AAAA (input argentino)
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    const dd = m[1].padStart(2, '0');
+    const mm = m[2].padStart(2, '0');
+    const aaaa = m[3];
+    return `${aaaa}-${mm}-${dd}`;
+  }
+  return null;
+};
+
 const generarCodigoRecibo = async (connection) => {
   const result = await reciboModel.getUltimoCodigo(connection);
   const ultimoCodigo = result.length > 0 ? result[0].ultimo : null;
@@ -60,8 +76,13 @@ const create = async (data, idPersonal) => {
     });
 
     if (detalle && detalle.length > 0) {
-      const detalleData = detalle.map(item => {
+      const detalleData = [];
+      for (const item of detalle) {
         const pagoNum = parseFloat(item.pago.toString().replace(/\./g, '').replace(',', '.'));
+
+        if (isNaN(pagoNum) || pagoNum <= 0) {
+          throw new Error(`El pago de la factura ${item.codigo_factura_venta || item.codigo_nota_credito} es inválido o está vacío`);
+        }
 
         let codigo = item.codigo_factura_venta || item.codigo_nota_credito;
 
@@ -70,23 +91,23 @@ const create = async (data, idPersonal) => {
         }
 
         if (codigo.startsWith('NCV')) {
-          return [
+          detalleData.push([
             codigoRecibo,
             null,
             codigo,
             pagoNum,
-          ];
+          ]);
         } else if (codigo.startsWith('FV')) {
-          return [
+          detalleData.push([
             codigoRecibo,
             codigo,
             null,
             pagoNum,
-          ];
+          ]);
         } else {
           throw new Error(`Código de comprobante no reconocido: ${codigo}`);
         }
-      });
+      }
 
       await reciboModel.insertDetalle(connection, detalleData);
 
@@ -126,10 +147,19 @@ const create = async (data, idPersonal) => {
     }
 
     if (otrosimpuestos && otrosimpuestos.length > 0) {
-      const impuestosData = otrosimpuestos.map(({ codigo_impuesto, valor }) => [
+      const impuestosData = otrosimpuestos.map(({ 
+        codigo_impuesto, 
+        valor,
+        tipo_retencion,
+        fecha_retencion,
+        numero_retencion
+      }) => [
         codigoRecibo,
         codigo_impuesto,
         parseFloat(valor),
+        tipo_retencion || null,
+        formatearFechaParaBD(fecha_retencion),
+        numero_retencion || null,
       ]);
 
       await reciboModel.insertOtrosImpuestos(connection, impuestosData);

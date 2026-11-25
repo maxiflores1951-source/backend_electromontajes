@@ -71,7 +71,7 @@ const updateNotaCredito = async (connection, codigo, params) => {
     id_proveedor, id_plancompra, id_motivo, id_servicio, id_movil,
     id_razonsocial, id_responsable, totalIVA21, totalIVA27, totalIVA10,
     bonificacion, importe, observacion, estado, saldoFinalNota, pagada,
-    id_factura_compra, id_modificado
+    id_factura_compra, id_modificado, fecha_modificacion
   } = params;
 
   await connection.query(
@@ -80,7 +80,7 @@ const updateNotaCredito = async (connection, codigo, params) => {
        id_proveedor = ?, id_plancompra = ?, id_motivo = ?, id_servicio = ?, id_movil = ?,
        id_razonsocial = ?, id_responsable = ?, totalIVA21 = ?, totalIVA27 = ?, totalIVA10 = ?,
        bonificacion = ?, importe = ?, observacion = ?, estado = ?, saldo = ?, pagada = ?,
-       id_factura_compra = ?, id_modificado = ?
+       id_factura_compra = ?, id_modificado = ?, fecha_modificacion = ?
      WHERE codigo = ?`,
     [
       fecha, tipoCmp, codigoletra, ptoVta, NroCmp, moneda, ctz || 1,
@@ -89,7 +89,7 @@ const updateNotaCredito = async (connection, codigo, params) => {
       totalIVA21 || 0, totalIVA27 || 0, totalIVA10 || 0,
       bonificacion || 0.00, importe, observacion || null, estado || 'Completa',
       saldoFinalNota ?? 0, pagada ?? 0, id_factura_compra || null,
-      id_modificado || null, codigo
+      id_modificado || null, fecha_modificacion || null, codigo
     ]
   );
 };

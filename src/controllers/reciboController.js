@@ -1,6 +1,10 @@
 const reciboService = require('../services/reciboService');
 
 const create = async (req, res) => {
+  console.log('=== RECIBO REQUEST BODY ===');
+  console.log(JSON.stringify(req.body, null, 2));
+  console.log('=== FIN RECIBO REQUEST BODY ===');
+
   try {
     const codigo = await reciboService.create(req.body, req.idPersonal);
     res.status(201).json({ mensaje: 'Recibo creado exitosamente', codigo });

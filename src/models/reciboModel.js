@@ -83,7 +83,8 @@ const updateComprobanteSaldo = async (connection, tabla, nuevoSaldo, estado, cod
 const insertOtrosImpuestos = async (connection, impuestosData) => {
   const query = `
     INSERT INTO otros_impuestos_recibo (
-      codigo_recibo, codigo_impuesto, valor
+      codigo_recibo, codigo_impuesto, valor,
+      tipo_retencion, fecha_retencion, numero_retencion
     ) VALUES ?
   `;
   const exec = connection ? connection.query.bind(connection) : db.query;
@@ -272,7 +273,10 @@ const getImpuestos = async (connection, codigoRecibo) => {
     SELECT 
       oir.codigo_impuesto,
       oi.nombre,
-      oir.valor
+      oir.valor,
+      oir.tipo_retencion,
+      oir.fecha_retencion,
+      oir.numero_retencion
     FROM otros_impuestos_recibo oir
     JOIN otros_impuestos oi ON oi.codigo = oir.codigo_impuesto
     WHERE oir.codigo_recibo = ?
@@ -328,6 +332,9 @@ const getImpuestosPorRazon = async (idRazonSocial, desdeCompleto, hastaCompleto)
         oi.codigo AS codigo_impuesto,
         oi.nombre AS nombre_impuesto,
         oir.valor AS importe,
+        oir.tipo_retencion,
+        oir.fecha_retencion,
+        oir.numero_retencion,
         CASE 
             WHEN oi.codigo = 'IMP-005' THEN 'RECURSOS HUMANOS'
             ELSE 'IMPUESTOS'
@@ -381,6 +388,9 @@ const getImpuestosPorFecha = async (desdeCompleto, hastaCompleto) => {
         oi.codigo AS codigo_impuesto,
         oi.nombre AS nombre_impuesto,
         oir.valor AS importe,
+        oir.tipo_retencion,
+        oir.fecha_retencion,
+        oir.numero_retencion,
         CASE 
             WHEN oi.codigo = 'IMP-005' THEN 'RECURSOS HUMANOS'
             ELSE 'IMPUESTOS'

@@ -500,7 +500,6 @@ const getSaldosPorCliente = async (idRazonSocial) => {
     JOIN clientes c ON fv.id_cliente = c.CODCLI
     JOIN razones_sociales rs ON fv.id_razonsocial = rs.id
     WHERE fv.id_razonsocial = ?
-      AND fv.saldo <> 0
     GROUP BY c.CODCLI, c.DENOMINACION, rs.razon_social, c.CUIT
     ORDER BY monto_total DESC
   `;

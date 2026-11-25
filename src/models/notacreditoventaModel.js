@@ -26,14 +26,15 @@ const insert = async (connection, data) => {
     NroCmp,
     estado,
     saldo,
+    id_creado,
   } = data;
 
   const query = `
     INSERT INTO nota_credito_venta (
       codigo, fecha, periodo_iva, moneda, ctz, id_cliente, id_razonsocial,
       importe, iva21, iva27, iva105, observacion, tipoCmp, codigoletra,
-      ptoVta, NroCmp, estado, saldo
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ptoVta, NroCmp, estado, saldo, id_creado
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const values = [
@@ -55,6 +56,7 @@ const insert = async (connection, data) => {
     NroCmp,
     estado || 0,
     saldo,
+    id_creado || null,
   ];
 
   const exec = connection ? connection.query.bind(connection) : db.query;
@@ -64,7 +66,7 @@ const insert = async (connection, data) => {
 const insertDetalles = async (connection, detallesData) => {
   const query = `
     INSERT INTO detalle_nota_credito_venta (
-      codigo_nota_credito_venta, codigo_factura_venta, descripcion, iva, importe
+      codigo_nota_credito_venta, descripcion, iva, importe
     ) VALUES ?
   `;
   const exec = connection ? connection.query.bind(connection) : db.query;
@@ -136,25 +138,8 @@ const getAll = async () => {
 const getDetalleCompleto = async (codigo) => {
   const query = `
     SELECT 
-      dncv.*, 
-      fv.codigo AS codigo_factura_relacionada,
-      fv.ptoVta AS ptoVta_factura,
-      fv.NroCmp AS NroCmp_factura,
-      fv.tipoCmp AS tipoCmp_factura,
-      fv.codigoletra AS letra_factura,
-      fv.fecha AS fecha_factura,
-      fv.importe AS importe_factura,
-      fv.iva21 AS iva21_factura,
-      fv.iva27 AS iva27_factura,
-      fv.iva105 AS iva105_factura,
-      fv.moneda AS moneda_factura,
-      fv.ctz AS ctz_factura,
-      tc_fv.descripcion AS descripcion_tipo_comprobante_factura,
-      tc_fv.letra AS letra_tipo_comprobante_factura,
-      tc_fv.clasificacion AS clasificacion_tipo_comprobante_factura
+      dncv.*
     FROM detalle_nota_credito_venta dncv
-    LEFT JOIN factura_venta fv ON dncv.codigo_factura_venta = fv.codigo
-    LEFT JOIN tipocomprobante tc_fv ON fv.tipoCmp = tc_fv.codigo
     WHERE dncv.codigo_nota_credito_venta = ?
   `;
   const [rows] = await db.query(query, [codigo]);
@@ -183,16 +168,45 @@ const getFormasPago = async (codigo) => {
   return rows;
 };
 
+const insertImputacion = async (connection, codigoNotaCreditoVenta, codigoFacturaVenta, importe) => {
+  const query = `
+    INSERT INTO imputacion_nota_venta_factura_venta
+      (codigo_nota_credito_venta, codigo_factura_venta, importe)
+    VALUES (?, ?, ?)`;
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  await exec(query, [codigoNotaCreditoVenta, codigoFacturaVenta, importe]);
+};
+
+const getImputacionesByNota = async (connection, codigo) => {
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  const [rows] = await exec(
+    'SELECT * FROM imputacion_nota_venta_factura_venta WHERE codigo_nota_credito_venta = ?',
+    [codigo]
+  );
+  return rows;
+};
+
+const deleteImputacionesByNota = async (connection, codigo) => {
+  const exec = connection ? connection.query.bind(connection) : db.query;
+  await exec(
+    'DELETE FROM imputacion_nota_venta_factura_venta WHERE codigo_nota_credito_venta = ?',
+    [codigo]
+  );
+};
+
 module.exports = {
   getUltimoCodigo,
   insert,
   insertDetalles,
   insertOtrosImpuestos,
   insertFormasPago,
+  insertImputacion,
   getByCodigo,
   getDetallesByCodigo,
   getAll,
   getDetalleCompleto,
   getOtrosImpuestos,
   getFormasPago,
+  getImputacionesByNota,
+  deleteImputacionesByNota,
 };
